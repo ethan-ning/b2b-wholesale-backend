@@ -2,6 +2,7 @@ package com.acme.b2b.domain.catalog
 
 import com.acme.b2b.domain.ProductFixtures.product
 import com.acme.b2b.domain.ProductFixtures.variant
+import com.acme.b2b.types.SkuCode
 import com.acme.b2b.types.VariantAxis
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,6 +98,26 @@ class ProductTest {
         assertTrue(gloves.hasStock)
         assertTrue(gloves.requireVariant(gloves.variants.first().sku).stock.isOutOfStock)
         assertFalse(gloves.variants.last().stock.isOutOfStock)
+    }
+
+    @Test
+    fun `a product is sellable only when every SKU is priced`() {
+        val gloves = product(
+            variants = listOf(variant("GL100-BLK-S", "S"), variant("GL100-BLK-M", "M")),
+            axis = VariantAxis.SIZE,
+        )
+
+        assertTrue(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"), SkuCode("GL100-BLK-M"))))
+        // Half-priced shows one size at list price and the other at nothing, which reads
+        // to the dealer as a broken page rather than as a missing price.
+        assertFalse(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"))))
+        assertFalse(gloves.isSellable(emptySet()))
+    }
+
+    @Test
+    fun `a freshly imported product is not sellable`() {
+        // What an ERP import looks like: real SKUs, no tier prices anywhere.
+        assertFalse(product().isSellable(emptySet()))
     }
 
     @Test

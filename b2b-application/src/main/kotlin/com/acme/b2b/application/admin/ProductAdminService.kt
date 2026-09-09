@@ -45,9 +45,14 @@ class ProductAdminService(
         )
         val page = products.search(criteria, Page(query.page, query.size))
         val names = categoryNames()
+        // One query for the whole page, not one per product.
+        val priced = tierPrices
+            .findAllFor(page.content.flatMap { product -> product.variants.map { it.sku } })
+            .map { it.sku }
+            .toSet()
 
         return PagedDTO(
-            content = page.content.map { toDto(it, names) },
+            content = page.content.map { toDto(it, names, sellable = it.isSellable(priced)) },
             totalElements = page.totalElements,
             totalPages = page.totalPages,
             page = page.page.number,
@@ -117,6 +122,15 @@ class ProductAdminService(
             return AdminProductDTO(toDto(existing, categoryNames()), priceBookOf(existing))
         }
 
+        // Refused rather than allowed and hidden later. An unpriced product that reaches
+        // the catalog is offered to dealers at its base price, and for an ERP import that
+        // is zero — the one mistake this flag can make that costs money.
+        if (active && !existing.isSellable(pricedSkusOf(existing))) {
+            throw UseCaseViolation(
+                "Set tier pricing for every SKU of ${existing.spuCode} before activating it"
+            )
+        }
+
         val saved = products.save(existing.withStatus(status))
         return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
     }
@@ -162,6 +176,10 @@ class ProductAdminService(
         }
     }
 
+    /** SKUs of this product that carry at least one tier price. */
+    private fun pricedSkusOf(product: Product): Set<SkuCode> =
+        tierPrices.findAllFor(product.variants.map { it.sku }).map { it.sku }.toSet()
+
     private fun priceBookOf(product: Product): List<TierPriceDTO> {
         val names = tiers.findAll().associate { it.id.value to it.name }
         val order = product.variants.map { it.sku }.withIndex().associate { (i, sku) -> sku to i }
@@ -184,13 +202,17 @@ class ProductAdminService(
      * The admin view shows list price rather than a tier price: there is no dealer in
      * this request to resolve one for.
      */
-    private fun toDto(product: Product, categoryNames: Map<Long, String>): ProductDTO {
+    private fun toDto(
+        product: Product,
+        categoryNames: Map<Long, String>,
+        sellable: Boolean? = null,
+    ): ProductDTO {
         val listPrices = product.variants.associate { variant ->
             variant.sku.value to PricingPolicy.resolve(
                 product, variant, LIST_PRICE_TIER, priceBook = emptyList(),
             )
         }
-        return ProductAssembler.toDTO(product, listPrices, categoryNames)
+        return ProductAssembler.toDTO(product, listPrices, categoryNames, sellable)
     }
 
     private fun categoryNames(): Map<Long, String> {

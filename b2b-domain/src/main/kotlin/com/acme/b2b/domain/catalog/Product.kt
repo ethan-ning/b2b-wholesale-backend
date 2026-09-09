@@ -54,6 +54,21 @@ class Product(
     val isPublished: Boolean get() = status == ProductStatus.ACTIVE
 
     /**
+     * Whether this product can be shown to a dealer at all.
+     *
+     * An ERP import arrives with no dealer price — Sellfox knows cost and stock, not what
+     * a dealer pays — so a product is not merely hidden until someone prices it, it is
+     * unsellable. Activating one would put it in the catalog at whatever
+     * [baseWholesalePrice] happens to be, which for an import is zero.
+     *
+     * [pricedSkus] is the set of SKU codes that have at least one tier price. Every SKU
+     * must be covered: a half-priced product shows some of its pack sizes at list price
+     * and the rest at nothing, which reads as a bug to the dealer looking at it.
+     */
+    fun isSellable(pricedSkus: Set<SkuCode>): Boolean =
+        variants.isNotEmpty() && variants.all { it.sku in pricedSkus }
+
+    /**
      * Returns the same product in a different visibility state. Everything else is carried
      * across, so deactivating cannot quietly lose pricing or categories along the way.
      */

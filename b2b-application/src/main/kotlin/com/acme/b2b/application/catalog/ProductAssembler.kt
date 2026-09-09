@@ -15,7 +15,12 @@ import com.acme.b2b.domain.pricing.ResolvedPrice
  */
 object ProductAssembler {
 
-    fun toDTO(product: Product, prices: Map<String, ResolvedPrice>, categoryNames: Map<Long, String>): ProductDTO =
+    fun toDTO(
+        product: Product,
+        prices: Map<String, ResolvedPrice>,
+        categoryNames: Map<Long, String>,
+        sellable: Boolean? = null,
+    ): ProductDTO =
         ProductDTO(
             id = product.id,
             spuCode = product.spuCode.value,
@@ -27,6 +32,7 @@ object ProductAssembler {
             variantAxis = product.variantAxis?.label,
             attributes = product.attributes,
             status = product.status.name,
+            sellable = sellable,
             categories = product.categoryIds.map { id ->
                 ProductCategoryDTO(
                     id = id,
