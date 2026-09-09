@@ -89,8 +89,6 @@ class ProductRepositoryImpl(
         return converter.toDomain(jpa.save(row))
     }
 
-    override fun deleteById(id: Long) = jpa.deleteById(id)
-
     /**
      * A product matches a price range if any of its SKUs does, and sorts on its cheapest
      * SKU — the "from" figure the dealer sees on the card.

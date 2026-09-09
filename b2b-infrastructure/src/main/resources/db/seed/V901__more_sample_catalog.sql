@@ -41,14 +41,14 @@ INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_pric
     (10, 'TL500', 'Socket Wrench Set', 'GripMaster',
          '40-piece metric and SAE socket wrench set with case.',
          28.00, 'D1-1', 'Pack Qty', '{"Pieces":"40","Drive_Size":"3/8 inch"}', 'ACTIVE'),
-    -- Archived: should not reach a dealer, and should be findable by the admin filter.
+    -- Deactivated: hidden from dealers, still findable by the admin filter.
     (11, 'WH900-SLV', 'Alloy Wheel - Silver', 'RoadForge',
          'Cast alloy wheel, discontinued line.',
-         145.00, 'E1-1', 'Size', '{"Finish":"Silver"}', 'ARCHIVED'),
-    -- Draft, and deliberately left unpriced so pricing falls through to list price.
+         145.00, 'E1-1', 'Size', '{"Finish":"Silver"}', 'INACTIVE'),
+    -- Deactivated, and deliberately left unpriced so pricing falls through to list price.
     (12, 'BR300-RED', 'Brake Caliper Cover - Red', 'StopTech',
          'Powder-coated caliper cover, awaiting pricing.',
-         24.00, 'E2-1', 'Pack Qty', '{"Color":"Red"}', 'DRAFT');
+         24.00, 'E2-1', 'Pack Qty', '{"Color":"Red"}', 'INACTIVE');
 SELECT setval('product_id_seq', (SELECT MAX(id) FROM product));
 
 -- sort_order is explicit throughout: S < M < L < XL is not lexical.

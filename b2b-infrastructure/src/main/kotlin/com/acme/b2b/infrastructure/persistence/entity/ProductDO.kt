@@ -42,7 +42,7 @@ class ProductDO(
     var attributesJson: String? = null,
 
     @Column(nullable = false)
-    var status: String = "DRAFT",
+    var status: String = "ACTIVE",
 
     @Column(name = "created_at")
     var createdAt: Instant? = null,

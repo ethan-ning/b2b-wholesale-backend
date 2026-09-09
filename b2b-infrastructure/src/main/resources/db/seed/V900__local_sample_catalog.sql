@@ -24,8 +24,8 @@ INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_pric
      'Heavy-duty stainless steel muffler extension pipe.',
      19.00, 'A1-1', 'Pack Qty', '{"Color":"Black","Material":"Stainless Steel"}', 'ACTIVE'),
     (3, 'LT200-WHT', 'LED Work Light Bar - White', 'LumenPro',
-     'Draft product, not visible to dealers.',
-     34.00, 'B3-1', 'Pack Qty', '{"Wattage":"120W"}', 'DRAFT');
+     'Deactivated product, not visible to dealers.',
+     34.00, 'B3-1', 'Pack Qty', '{"Wattage":"120W"}', 'INACTIVE');
 SELECT setval('product_id_seq', (SELECT MAX(id) FROM product));
 
 -- sort_order is explicit: S < M < L < XL is not lexical.

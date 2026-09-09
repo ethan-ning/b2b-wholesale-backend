@@ -111,7 +111,8 @@ Carried over from the frontend's design work — see the portal repo's
 |---|---|
 | `POST /api/admin/auth/login` | BCrypt verify, HS256 token with `scope: ADMIN` |
 | `GET /api/admin/dashboard` | counting queries only, so it does not slow as the catalog grows |
-| `GET/PUT/DELETE /api/admin/products` | portal-owned fields only; no create — products arrive from the ERP |
+| `GET/PUT /api/admin/products` | portal-owned fields only. No create and no delete — products arrive from the ERP |
+| `POST /api/admin/products/{id}/deactivate` `.../activate` | hides a product from dealers, reversibly |
 | `GET/POST/PUT/DELETE /api/admin/categories` | our taxonomy; delete refuses rather than cascades |
 | `GET /api/admin/inventory` | read-only; the ERP owns stock |
 | `GET/POST/PUT /api/admin/customers`, `POST .../reset-password`, `GET /api/admin/tiers` | dealer accounts |
@@ -123,6 +124,13 @@ Two rules the code enforces structurally rather than by review:
   because a check rejects them.
 - **Category delete refuses when the node has children or products**, rather than
   cascading. A cascade would unfile products invisibly from the button the admin pressed.
+- **A product has two states, ACTIVE and INACTIVE, and cannot be deleted.** There is no
+  draft — products arrive from the ERP already real — and no separate archived state,
+  since it meant the same thing as inactive and two names for one rule invites two
+  behaviours. Deactivating is the portal's way to remove something from the catalog: the
+  product, its pricing and its history survive, so reactivating restores exactly what was
+  there. A delete would be undone by the next sync anyway, having taken the pricing with
+  it, so `ProductRepository` has no delete method to call.
 
 ### Local sample data
 

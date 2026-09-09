@@ -16,13 +16,13 @@ INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_pric
     (14, 'CH500-BLK', 'Riding Chaps - Black', 'RiderEdge', NULL, 78.00, 'C1-4', 'Size', '{"Color":"Black","Material":"Cowhide Leather"}', 'ACTIVE'),
     (15, 'GL200-BLK', 'Winter Riding Gloves - Black', 'RiderEdge', NULL, 26.00, 'C2-3', 'Size', '{"Color":"Black","Lining":"Thinsulate"}', 'ACTIVE'),
     (16, 'LT300-WHT', 'LED Spot Light - White', 'LumenPro', NULL, 21.00, 'B3-3', 'Pack Qty', '{"Wattage":"40W","IP_Rating":"IP67"}', 'ACTIVE'),
-    (17, 'LT400-RED', 'Tail Light Kit - Red', 'LumenPro', NULL, 27.50, 'B3-4', 'Pack Qty', '{"Color":"Red"}', 'DRAFT'),
+    (17, 'LT400-RED', 'Tail Light Kit - Red', 'LumenPro', NULL, 27.50, 'B3-4', 'Pack Qty', '{"Color":"Red"}', 'INACTIVE'),
     (18, 'EX200-SS', 'Slip-On Muffler - Stainless', 'TurboKing', NULL, 96.00, 'A2-2', 'Pack Qty', '{"Material":"Stainless Steel"}', 'ACTIVE'),
     (19, 'TL600', 'Torque Wrench 1/2 inch', 'GripMaster', NULL, 54.00, 'D1-2', NULL, '{"Drive_Size":"1/2 inch","Range":"20-200 Nm"}', 'ACTIVE'),
     (20, 'TL700', 'Precision Screwdriver Set', 'GripMaster', NULL, 16.00, 'D1-3', 'Pack Qty', '{"Pieces":"24"}', 'ACTIVE'),
     (21, 'WH901-BLK', 'Alloy Wheel - Matte Black', 'RoadForge', NULL, 158.00, 'E1-2', 'Size', '{"Finish":"Matte Black"}', 'ACTIVE'),
     (22, 'BR400-BLU', 'Brake Pad Set - Sintered', 'StopTech', NULL, 31.00, 'E2-2', 'Pack Qty', '{"Compound":"Sintered"}', 'ACTIVE'),
-    (23, 'BR500-BLK', 'Braided Brake Line Kit', 'StopTech', NULL, 44.00, 'E2-3', NULL, '{"Length":"36 inch"}', 'ARCHIVED'),
+    (23, 'BR500-BLK', 'Braided Brake Line Kit', 'StopTech', NULL, 44.00, 'E2-3', NULL, '{"Length":"36 inch"}', 'INACTIVE'),
     (24, 'HG100-BLK', 'Helmet Bag - Black', 'RiderEdge', NULL, 19.00, 'C3-1', 'Pack Qty', '{"Material":"600D Nylon"}', 'ACTIVE');
 SELECT setval('product_id_seq', (SELECT MAX(id) FROM product));
 

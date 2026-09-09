@@ -102,10 +102,23 @@ class ProductAdminService(
         return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
     }
 
+    /**
+     * Hides a product from dealers, or brings it back. The portal's only way to remove
+     * something from the catalog — the product, its pricing and its history all survive,
+     * so reactivating restores exactly what was there.
+     */
     @Transactional
-    fun delete(id: Long) {
-        products.findById(id) ?: throw NoSuchElementException("No product with id $id")
-        products.deleteById(id)
+    fun setActive(id: Long, active: Boolean): AdminProductDTO {
+        val existing = products.findById(id)
+            ?: throw NoSuchElementException("No product with id $id")
+
+        val status = if (active) ProductStatus.ACTIVE else ProductStatus.INACTIVE
+        if (existing.status == status) {
+            return AdminProductDTO(toDto(existing, categoryNames()), priceBookOf(existing))
+        }
+
+        val saved = products.save(existing.withStatus(status))
+        return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
     }
 
     /**

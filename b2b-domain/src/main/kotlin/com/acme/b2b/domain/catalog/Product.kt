@@ -52,6 +52,15 @@ class Product(
 
     val isPublished: Boolean get() = status == ProductStatus.ACTIVE
 
+    /**
+     * Returns the same product in a different visibility state. Everything else is carried
+     * across, so deactivating cannot quietly lose pricing or categories along the way.
+     */
+    fun withStatus(status: ProductStatus) = Product(
+        id, spuCode, name, brand, description, baseWholesalePrice, locationCode, variantAxis,
+        attributes, status, categoryIds, primaryCategoryId, imageUrls, variants,
+    )
+
     fun variant(sku: SkuCode): ProductVariant? = variants.firstOrNull { it.sku == sku }
 
     fun requireVariant(sku: SkuCode): ProductVariant =

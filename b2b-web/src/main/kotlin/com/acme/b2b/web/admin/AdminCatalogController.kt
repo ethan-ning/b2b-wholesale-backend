@@ -46,11 +46,16 @@ class AdminCatalogController(
     fun updateProduct(@PathVariable id: Long, @RequestBody command: UpdateProductCommand): AdminProductDTO =
         products.update(id, command)
 
-    @DeleteMapping("/products/{id}")
-    fun deleteProduct(@PathVariable id: Long): ResponseEntity<Void> {
-        products.delete(id)
-        return ResponseEntity.noContent().build()
-    }
+    /**
+     * Deactivate or reactivate. There is no DELETE: products belong to the ERP, and a
+     * portal delete would be undone by the next sync while losing the pricing attached
+     * to it.
+     */
+    @PostMapping("/products/{id}/deactivate")
+    fun deactivateProduct(@PathVariable id: Long): AdminProductDTO = products.setActive(id, false)
+
+    @PostMapping("/products/{id}/activate")
+    fun activateProduct(@PathVariable id: Long): AdminProductDTO = products.setActive(id, true)
 
     // ─── Categories ──────────────────────────────────────────────────────
     @GetMapping("/categories")
