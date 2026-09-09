@@ -4,10 +4,6 @@
 # The toolchain every module compiles, tests and runs against. Feeds jvmToolchain(),
 # so this line alone determines the bytecode — independent of the machine's default JDK.
 java = "21"
-# Must match gradle/wrapper/gradle-wrapper.properties. The wrapper cannot read this file
-# (it bootstraps before any build script), so checkVersionConsistency compares them.
-gradle = "9.7.1"
-
 kotlin = "2.2.21"
 springBoot = "3.5.0"
 

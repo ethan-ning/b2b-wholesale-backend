@@ -123,26 +123,23 @@ as a Gradle platform, so no module names a version.
 
 ### Where versions live
 
-`gradle/libs.versions.toml` declares everything: `java`, `gradle`, `kotlin`,
-`springBoot`, and every library and plugin. `java` feeds `jvmToolchain()` directly, so
-that one line determines the bytecode.
+`gradle/libs.versions.toml` declares `java`, `kotlin`, `springBoot`, and every library
+and plugin. Each entry is consumed by the build — `java` feeds `jvmToolchain()`, so that
+one line determines the bytecode — and no `build.gradle.kts` contains a version literal.
 
-The single exception is Gradle itself, which must live in
-`gradle/wrapper/gradle-wrapper.properties` — the wrapper bootstraps before any build
-script runs, so it cannot read the catalog. `checkVersionConsistency`, wired into
-`check`, compares the two and fails naming the fix:
+Gradle's own version lives in `gradle/wrapper/gradle-wrapper.properties`, because the
+wrapper bootstraps before any build script runs. It is not mirrored in the catalog: a
+second copy would be decorative, since the wrapper is what actually runs, and a mismatch
+between them announces itself immediately.
 
-```
-Wrapper is Gradle 9.7.1 but libs.versions.toml declares gradle = "9.9.9"; run: ./gradlew wrapper --gradle-version 9.9.9
-```
+Two earlier drafts of this are worth not repeating:
 
-An earlier draft also pinned the JVM the Gradle daemon runs on, via
-`gradle-daemon-jvm.properties` and the foojay toolchain resolver. That was removed: the
-daemon's JVM does not affect the bytecode — `jvmToolchain` already guarantees that — so
-it bought only that the build *process* ran on a known JVM, at the cost of a plugin, a
-generated file of baked download URLs, and half of the drift check. If a machine's
-default JDK is ever incompatible with our Gradle version, Gradle says so and `JAVA_HOME`
-is the fix.
+- Pinning the daemon's JVM via `gradle-daemon-jvm.properties` and the foojay resolver.
+  The daemon's JVM does not affect the bytecode — `jvmToolchain` already guarantees that
+  — so it bought only a known JVM for the build *process*, at the cost of a plugin, a
+  file of baked download URLs, and a consistency check.
+- Mirroring the Gradle version into the catalog and adding a task to keep the two in
+  step. That guarded a duplicate that need not have existed.
 
 ### Why these versions
 

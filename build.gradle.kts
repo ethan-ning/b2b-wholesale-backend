@@ -30,37 +30,6 @@ subprojects {
 }
 
 /**
- * The Gradle version cannot live in the version catalog — the wrapper bootstraps before
- * any build script runs — so the catalog holds the declared value and this task fails if
- * the wrapper drifts from it.
- *
- * Java needs no such check: `java` in the catalog feeds `jvmToolchain()` directly, which
- * is what determines the bytecode.
- */
-val checkVersionConsistency = tasks.register("checkVersionConsistency") {
-    group = "verification"
-    description = "Fails if the Gradle wrapper drifts from the version declared in libs.versions.toml."
-
-    val declaredGradle = libs.versions.gradle.get()
-    val wrapperProps = layout.projectDirectory.file("gradle/wrapper/gradle-wrapper.properties").asFile
-
-    doLast {
-        val wrapperVersion = wrapperProps.takeIf { it.exists() }
-            ?.readLines()
-            ?.firstOrNull { it.startsWith("distributionUrl=") }
-            ?.let { Regex("gradle-([0-9.]+)-").find(it)?.groupValues?.get(1) }
-
-        check(wrapperVersion != null) {
-            "Could not read the Gradle version from gradle/wrapper/gradle-wrapper.properties"
-        }
-        check(wrapperVersion == declaredGradle) {
-            "Wrapper is Gradle $wrapperVersion but libs.versions.toml declares gradle = \"$declaredGradle\"; " +
-                "run: ./gradlew wrapper --gradle-version $declaredGradle"
-        }
-    }
-}
-
-/**
  * Guards the rule the module graph cannot express on its own: the two innermost layers
  * must stay free of framework types, so business rules unit-test with no container and
  * are not pinned to Spring or JPA.
