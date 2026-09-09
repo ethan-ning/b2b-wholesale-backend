@@ -65,6 +65,28 @@ Anything outside the process is a port the domain declares and infrastructure ad
   lookup needs the dealer's tier, but the use case must not know how identity was
   established. The current adapter reads a header; a JWT adapter replaces that one class.
 
+## Where authentication lives
+
+Nothing below the web layer ever sees a token.
+
+| Concern | Module | Why there |
+|---|---|---|
+| Signing and verification — algorithm, key, claim names | `b2b-infrastructure` (`security/JwtTokens.kt`) | Both halves of one mechanism. Stated once so they cannot drift; moving to asymmetric keys is a change to this file alone |
+| Which routes need which authority, CORS | `b2b-web` (`security/WebSecurityConfig.kt`) | The rules describe this module's own endpoints; a controller and the rule protecting it should not be two modules apart |
+| Who is asking, for a use case that needs it | `DealerContext` port, application layer | A use case needs the dealer's tier to price a lookup, not the fact that a JWT carried it |
+
+Verification runs in Spring Security's filter chain, ahead of every controller: a request
+either arrives authenticated or never reaches one. `b2b-web` injects a `JwtDecoder` and
+states no opinion on how it works, which is why its security test stands the whole filter
+chain up with a decoder of its own and no infrastructure module at all.
+
+`b2b-start` configures no security. It composes the modules and nothing more.
+
+An earlier arrangement had signing in infrastructure and verification in `b2b-start`, each
+independently choosing HS256 and reading the secret. Nothing coupled them — changing the
+issuer to RS256 would have left the decoder validating HMAC, with nothing failing to
+compile.
+
 ## Business rules encoded
 
 Carried over from the frontend's design work — see the portal repo's

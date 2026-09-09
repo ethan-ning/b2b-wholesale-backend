@@ -7,18 +7,26 @@ import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.stereotype.Component
 import java.time.Instant
 import java.util.Date
+import javax.crypto.spec.SecretKeySpec
 
 /**
- * Issues the HS256 tokens the resource server validates. Symmetric signing is adequate
- * while one service both issues and verifies; move to asymmetric keys when a second
- * service needs to verify without being able to mint.
+ * Both halves of the token mechanism live here, deliberately: the algorithm and the key
+ * are stated once, so signing and verification cannot drift apart. They were previously
+ * split across two modules, each choosing HS256 independently — changing one would have
+ * left the other happily validating the old scheme, with nothing failing to compile.
  *
- * The dealer's tier travels in the token so pricing a catalog request does not need a
- * customer lookup — which also means a tier change only takes effect on next login.
+ * Symmetric signing is adequate while one service both issues and verifies. Moving to
+ * asymmetric keys is a change to this file alone.
  */
+private const val ALGORITHM = "HmacSHA256"
+
 @Component
 class JwtAccessTokenIssuer(
     @Value("\${security.jwt.secret}") private val secret: String,
@@ -36,6 +44,10 @@ class JwtAccessTokenIssuer(
                 .claim("role", role)
         )
 
+    /**
+     * The dealer's tier travels in the token so pricing a catalog request needs no
+     * customer lookup. The cost is that a tier change only takes effect on next login.
+     */
     override fun issueForDealer(customerId: Long, email: String, tierId: Long): String =
         sign(
             JWTClaimsSet.Builder()
@@ -57,4 +69,16 @@ class JwtAccessTokenIssuer(
         jwt.sign(signer)
         return jwt.serialize()
     }
+}
+
+/**
+ * The verification half. Spring Security's filter chain uses this decoder; the web
+ * layer states which routes need which authority without knowing how a token is read.
+ */
+@Configuration
+class JwtDecoderConfig {
+
+    @Bean
+    fun jwtDecoder(@Value("\${security.jwt.secret}") secret: String): JwtDecoder =
+        NimbusJwtDecoder.withSecretKey(SecretKeySpec(secret.toByteArray(), ALGORITHM)).build()
 }

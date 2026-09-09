@@ -1,50 +1,72 @@
-package com.acme.b2b
+package com.acme.b2b.web.security
 
 import com.acme.b2b.application.admin.AdminAuthService
 import com.acme.b2b.application.admin.CustomerAdminService
 import com.acme.b2b.application.admin.dto.AdminLoginResponse
 import com.acme.b2b.application.admin.dto.AdminUserDTO
+import com.acme.b2b.application.catalog.CatalogQueryService
 import com.acme.b2b.application.catalog.dto.PagedDTO
-import com.acme.b2b.config.SecurityConfig
-import com.acme.b2b.infrastructure.security.JwtAccessTokenIssuer
-import com.acme.b2b.web.admin.AdminAuthController
-import com.acme.b2b.web.admin.AdminCustomerController
 import com.acme.b2b.web.support.ApiExceptionHandler
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
-import org.springframework.test.context.TestPropertySource
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
+import java.util.Date
+import javax.crypto.spec.SecretKeySpec
+
+private const val SECRET = "test-secret-that-is-at-least-32-bytes-long"
 
 /**
- * The security rules, exercised through the real filter chain with real signed tokens.
- * No database: the application services are mocked, because what is under test is who
- * may reach an endpoint, not what the endpoint computes.
+ * The route rules, exercised through the real filter chain with real signed tokens.
+ *
+ * No database and no infrastructure module: the application services are mocked and the
+ * decoder is supplied here. That the test can stand up this module's security with only
+ * a JwtDecoder is the point — the web layer depends on the abstraction, not on how the
+ * token is signed.
  */
-@WebMvcTest(controllers = [AdminAuthController::class, AdminCustomerController::class])
-@Import(SecurityConfig::class, ApiExceptionHandler::class)
-@TestPropertySource(properties = ["security.jwt.secret=test-secret-that-is-at-least-32-bytes-long"])
+@WebMvcTest
+@Import(WebSecurityConfig::class, ApiExceptionHandler::class, AdminApiSecurityTest.TestBeans::class)
 class AdminApiSecurityTest {
+
+    @TestConfiguration
+    class TestBeans {
+        @Bean
+        fun jwtDecoder(): JwtDecoder =
+            NimbusJwtDecoder.withSecretKey(SecretKeySpec(SECRET.toByteArray(), "HmacSHA256")).build()
+    }
 
     @Autowired private lateinit var mockMvc: MockMvc
     @MockitoBean private lateinit var adminAuth: AdminAuthService
     @MockitoBean private lateinit var customers: CustomerAdminService
 
-    private val tokens = JwtAccessTokenIssuer("test-secret-that-is-at-least-32-bytes-long", 60)
-    private val adminToken = tokens.issueForAdmin(1, "admin@example.com", "SUPER_ADMIN")
-    private val dealerToken = tokens.issueForDealer(7, "dealer@example.com", 1)
+    /** Not exercised here, but the whole routing table loads, so it must be satisfiable. */
+    @MockitoBean private lateinit var catalog: CatalogQueryService
+
+    private val adminToken = token(scope = "ADMIN", secret = SECRET)
+    private val dealerToken = token(scope = "DEALER", secret = SECRET)
 
     @Test
     fun `login is reachable without a token`() {
-        whenever(adminAuth.login(org.mockito.kotlin.any())).thenReturn(
+        whenever(adminAuth.login(any())).thenReturn(
             AdminLoginResponse("a-token", AdminUserDTO(1, "admin@example.com", "System Admin", "SUPER_ADMIN"))
         )
 
@@ -65,15 +87,13 @@ class AdminApiSecurityTest {
 
     @Test
     fun `admin routes reject a dealer's token`() {
-        // The claim that matters most here: a dealer session cannot reach the back office.
         mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $dealerToken"))
             .andExpect(status().isForbidden)
     }
 
     @Test
     fun `admin routes accept an admin's token`() {
-        whenever(customers.list(org.mockito.kotlin.any()))
-            .thenReturn(PagedDTO(emptyList(), 0, 0, 0, 10))
+        whenever(customers.list(any())).thenReturn(PagedDTO(emptyList(), 0, 0, 0, 10))
 
         mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $adminToken"))
             .andExpect(status().isOk)
@@ -81,8 +101,7 @@ class AdminApiSecurityTest {
 
     @Test
     fun `a token signed with the wrong key is rejected`() {
-        val forged = JwtAccessTokenIssuer("a-completely-different-secret-32-bytes!!", 60)
-            .issueForAdmin(1, "admin@example.com", "SUPER_ADMIN")
+        val forged = token(scope = "ADMIN", secret = "a-completely-different-secret-32-bytes!!")
 
         mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $forged"))
             .andExpect(status().isUnauthorized)
@@ -90,10 +109,24 @@ class AdminApiSecurityTest {
 
     @Test
     fun `an expired token is rejected`() {
-        val expired = JwtAccessTokenIssuer("test-secret-that-is-at-least-32-bytes-long", -1)
-            .issueForAdmin(1, "admin@example.com", "SUPER_ADMIN")
+        val expired = token(scope = "ADMIN", secret = SECRET, ttlSeconds = -60)
 
         mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $expired"))
             .andExpect(status().isUnauthorized)
+    }
+
+    private fun token(scope: String, secret: String, ttlSeconds: Long = 3600): String {
+        val now = Instant.now()
+        val jwt = SignedJWT(
+            JWSHeader(JWSAlgorithm.HS256),
+            JWTClaimsSet.Builder()
+                .subject("1")
+                .claim("scope", scope)
+                .issueTime(Date.from(now))
+                .expirationTime(Date.from(now.plusSeconds(ttlSeconds)))
+                .build(),
+        )
+        jwt.sign(MACSigner(secret.toByteArray()))
+        return jwt.serialize()
     }
 }
