@@ -12,7 +12,8 @@ class SellfoxSyncRunTest {
     private val start = Instant.parse("2026-09-09T02:15:00Z")
     private val end = Instant.parse("2026-09-09T02:17:30Z")
 
-    private fun started() = SellfoxSyncRun.started(TriggerSource.SCHEDULED, null, start)
+    private fun started() =
+        SellfoxSyncRun.started(SyncMode.FULL, TriggerSource.SCHEDULED, null, start)
 
     @Test
     fun `a run begins recorded rather than reported at the end`() {
@@ -56,10 +57,21 @@ class SellfoxSyncRunTest {
 
     @Test
     fun `a manual run records who asked for it`() {
-        val run = SellfoxSyncRun.started(TriggerSource.MANUAL, "admin@example.com", start)
+        val run = SellfoxSyncRun.started(SyncMode.FULL, TriggerSource.MANUAL, "admin@example.com", start)
 
         assertEquals(TriggerSource.MANUAL, run.trigger)
         assertEquals("admin@example.com", run.triggeredBy)
+    }
+
+    @Test
+    fun `a run remembers how deep it went`() {
+        val stockOnly =
+            SellfoxSyncRun.started(SyncMode.INVENTORY, TriggerSource.SCHEDULED, null, start)
+
+        // The hourly and the nightly run land in the same table; without this an admin
+        // reading "0 products" cannot tell a quiet catalog from a run that never looked.
+        assertEquals(SyncMode.INVENTORY, stockOnly.mode)
+        assertEquals(SyncMode.FULL, started().mode)
     }
 
     @Test

@@ -2,7 +2,27 @@ package com.acme.b2b.domain.sellfox
 
 import java.time.Instant
 
-enum class TriggerSource { SCHEDULED, MANUAL }
+enum class TriggerSource {
+    SCHEDULED,
+    MANUAL,
+    /** The run a scope change causes. The only one that can deactivate a live product. */
+    SCOPE_CHANGE,
+}
+
+/**
+ * How deep a run goes over the one shared scope.
+ *
+ * Not a job type — there is a single scope and a single place to set it. This says how
+ * much of it a given run covers, which is what lets stock refresh hourly while the
+ * catalog scan, which pages every commodity Sellfox holds, runs once a day.
+ */
+enum class SyncMode {
+    /** Catalog and stock. Imports what is in scope and deactivates what has left it. */
+    FULL,
+
+    /** Stock only, for the selected warehouses. */
+    INVENTORY,
+}
 
 enum class RunStatus { RUNNING, SUCCESS, FAILED }
 
@@ -15,6 +35,7 @@ enum class RunStatus { RUNNING, SUCCESS, FAILED }
  */
 data class SellfoxSyncRun(
     val id: Long?,
+    val mode: SyncMode,
     val trigger: TriggerSource,
     val status: RunStatus,
     /** The admin who pressed the button; null for scheduled runs. */
@@ -31,9 +52,10 @@ data class SellfoxSyncRun(
         /** Long enough to be diagnostic, short enough that a stack trace cannot fill a page. */
         private const val MAX_ERROR_LENGTH = 2000
 
-        fun started(trigger: TriggerSource, triggeredBy: String?, at: Instant) =
+        fun started(mode: SyncMode, trigger: TriggerSource, triggeredBy: String?, at: Instant) =
             SellfoxSyncRun(
                 id = null,
+                mode = mode,
                 trigger = trigger,
                 status = RunStatus.RUNNING,
                 triggeredBy = triggeredBy,

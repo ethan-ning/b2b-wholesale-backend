@@ -127,6 +127,7 @@ class SellfoxSyncRunRepositoryImpl(
 
     override fun save(run: SellfoxSyncRun): SellfoxSyncRun {
         val row = run.id?.let { jpa.findById(it).orElse(null) } ?: SellfoxSyncRunDO()
+        row.mode = run.mode.name
         row.triggerSource = run.trigger.name
         row.status = run.status.name
         row.triggeredBy = run.triggeredBy
@@ -158,6 +159,7 @@ class SellfoxSyncRunRepositoryImpl(
 
     private fun SellfoxSyncRunDO.toDomain() = SellfoxSyncRun(
         id = id,
+        mode = SyncMode.valueOf(mode),
         trigger = TriggerSource.valueOf(triggerSource),
         status = RunStatus.valueOf(status),
         triggeredBy = triggeredBy,

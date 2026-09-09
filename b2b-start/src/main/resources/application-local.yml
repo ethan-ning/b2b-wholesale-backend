@@ -33,7 +33,8 @@ sellfox:
     # Manual triggering only. A cron firing while you are mid-debug rewrites the rows
     # you were looking at.
     enabled: ${SELLFOX_SCHEDULE_ENABLED:false}
-    cron: ${SELLFOX_CRON:0 5 * * * *}
+    inventory-cron: ${SELLFOX_INVENTORY_CRON:0 5 * * * *}
+    full-cron: ${SELLFOX_FULL_CRON:0 15 2 * * *}
     zone: ${SELLFOX_SCHEDULE_ZONE:America/Chicago}
 
 logging:

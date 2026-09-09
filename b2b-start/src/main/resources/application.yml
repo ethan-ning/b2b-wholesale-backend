@@ -49,10 +49,11 @@ sellfox:
     # Off unless asked for. A second instance running the same cron would double every
     # sync, so enabling it is a deployment decision rather than a default.
     enabled: ${SELLFOX_SCHEDULE_ENABLED:false}
-    # Hourly. A run pages every commodity Sellfox holds — the endpoint takes no category
-    # filter — so a couple of minutes of paced calls is the floor, and that is what sets
-    # this frequency rather than how fresh stock ought to be.
-    cron: ${SELLFOX_CRON:0 5 * * * *}
+    # Stock, hourly at five past. Reads only the selected warehouses.
+    inventory-cron: ${SELLFOX_INVENTORY_CRON:0 5 * * * *}
+    # Everything, nightly at 02:15. Pages the whole catalog and deactivates what has left
+    # the scope — a couple of minutes of paced calls, so not more often than daily.
+    full-cron: ${SELLFOX_FULL_CRON:0 15 2 * * *}
     zone: ${SELLFOX_SCHEDULE_ZONE:America/Chicago}
 
 server:

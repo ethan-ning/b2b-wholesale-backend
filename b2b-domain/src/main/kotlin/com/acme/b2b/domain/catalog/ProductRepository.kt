@@ -38,6 +38,17 @@ interface ProductRepository {
      */
     fun saveSynced(incoming: Product, existing: Product): Product
 
+    /**
+     * Hides ERP-sourced products a full sync did not see — their category left the import
+     * scope, or the supplier dropped them. Returns how many changed.
+     *
+     * Deactivated, never deleted: the pricing an admin set hangs off these rows, and a
+     * category removed by mistake would otherwise cost all of it. Only Sellfox-sourced
+     * rows are touched, so a product keyed in by hand is not swept up by a sync it was
+     * never part of.
+     */
+    fun deactivateSyncedProductsNotIn(spuCodes: Set<SpuCode>): Int
+
     fun countAll(): Long
     fun countByStatus(status: ProductStatus): Long
 }

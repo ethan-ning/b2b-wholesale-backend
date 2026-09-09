@@ -30,12 +30,23 @@ class AdminSellfoxController(
     @GetMapping("/scope")
     fun scope(): SellfoxScopeView = admin.scope()
 
-    /** The complete selection, not a toggle — so clearing is one call, not ninety. */
-    @PutMapping("/scope/categories")
-    fun selectCategories(@RequestBody body: CategorySelection) = admin.selectCategories(body.cids)
-
-    @PutMapping("/scope/warehouses")
-    fun selectWarehouses(@RequestBody body: WarehouseSelection) = admin.selectWarehouses(body.warehouseIds)
+    /**
+     * Replaces the whole scope and immediately starts a full sync.
+     *
+     * The sync is not optional. Narrowing the scope leaves products in the catalog that
+     * are no longer meant to be there, and the run is what deactivates them — saving
+     * without it would leave the site selling something the admin had just removed.
+     */
+    @PutMapping("/scope")
+    fun setScope(@RequestBody body: ScopeRequest): SellfoxSyncRun {
+        if (admin.running()) throw UseCaseViolation("A sync is already running")
+        // Read here, not inside the lambda: the security context is a thread-local, and
+        // the run executes on a pool thread that has none. Read there it comes back null,
+        // and the history loses who changed the scope — the one run where that matters.
+        val by = currentAdminEmail()
+        admin.setScope(body.cids, body.warehouseIds)
+        return start(TriggerSource.SCOPE_CHANGE) { sync.syncFull(it, by) }
+    }
 
     @GetMapping("/runs")
     fun runs(@RequestParam(defaultValue = "25") limit: Int): SyncHistoryResponse =
@@ -46,8 +57,9 @@ class AdminSellfoxController(
      * outcome — the same place a scheduled run reports it, so there is one way to read
      * what happened rather than two.
      */
+    /** `mode=inventory` refreshes stock only; the default is a full run. */
     @PostMapping("/runs")
-    fun trigger(): SellfoxSyncRun {
+    fun trigger(@RequestParam(required = false) mode: String?): SellfoxSyncRun {
         val by = currentAdminEmail()
 
         // Both checked here, on the request thread. The sync checks again on its own
@@ -57,17 +69,29 @@ class AdminSellfoxController(
         if (admin.running()) throw UseCaseViolation("A sync is already running")
         sync.requireScopeChosen()
 
-        val started = CompletableFuture.supplyAsync { sync.sync(TriggerSource.MANUAL, by) }
+        val inventoryOnly = mode?.equals("inventory", ignoreCase = true) == true
+        return start(TriggerSource.MANUAL) {
+            if (inventoryOnly) sync.syncInventory(it, by) else sync.syncFull(it, by)
+        }
+    }
 
-        // A brief wait so the response carries the run's own record rather than the
-        // previous one. A failure past this point is not lost — the runner writes it to
-        // the history, which is where a scheduled run reports too.
-        return started.completeOnTimeout(null, HANDOFF_MILLIS, TimeUnit.MILLISECONDS)
+    /**
+     * Dispatches the run and answers with its record.
+     *
+     * A brief wait so the response carries this run rather than the previous one. A
+     * failure past this point is not lost — the runner writes it to the history, which is
+     * where a scheduled run reports too.
+     */
+    private fun start(
+        trigger: TriggerSource,
+        run: (TriggerSource) -> SellfoxSyncRun,
+    ): SellfoxSyncRun =
+        CompletableFuture.supplyAsync { run(trigger) }
+            .completeOnTimeout(null, HANDOFF_MILLIS, TimeUnit.MILLISECONDS)
             .exceptionally { null }
             .join()
             ?: admin.history(1).firstOrNull()
             ?: throw IllegalStateException("Sync did not start")
-    }
 
     private fun currentAdminEmail(): String? =
         (SecurityContextHolder.getContext().authentication as? JwtAuthenticationToken)
@@ -78,9 +102,10 @@ class AdminSellfoxController(
     }
 }
 
-data class CategorySelection(val cids: Set<String> = emptySet())
-
-data class WarehouseSelection(val warehouseIds: Set<Long> = emptySet())
+data class ScopeRequest(
+    val cids: Set<String> = emptySet(),
+    val warehouseIds: Set<Long> = emptySet(),
+)
 
 data class SyncHistoryResponse(
     val runs: List<SellfoxSyncRun>,

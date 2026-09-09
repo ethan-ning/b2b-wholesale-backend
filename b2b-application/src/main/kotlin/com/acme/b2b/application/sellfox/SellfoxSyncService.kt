@@ -46,13 +46,32 @@ class SellfoxSyncService(
     private val clock: Clock,
 ) {
 
-    fun sync(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun {
+    /**
+     * A full run: import what is in scope, hide what has left it, then count what remains.
+     *
+     * The order is deliberate. Products first, so a SKU imported by this run gets its
+     * stock from the same run; deactivation before stock, so a product on its way out is
+     * not counted on its way past.
+     */
+    fun syncFull(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun {
         requireScopeChosen()
-        return runner.run(trigger, triggeredBy) { counts ->
+        return runner.run(SyncMode.FULL, trigger, triggeredBy) { counts ->
             val now = clock.instant()
             val catalog = importCatalog(counts, now)
             val inventory = applyStock(counts, now)
             "$catalog $inventory"
+        }
+    }
+
+    /**
+     * Stock only. Cheap enough to run hourly, which is the point: stock is the part that
+     * moves between catalog changes, and a full run has to page every commodity Sellfox
+     * holds to find the handful that changed.
+     */
+    fun syncInventory(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun {
+        requireScopeChosen()
+        return runner.run(SyncMode.INVENTORY, trigger, triggeredBy) { counts ->
+            applyStock(counts, clock.instant())
         }
     }
 
@@ -101,6 +120,16 @@ class SellfoxSyncService(
         val families = SpuGrouping.group(commodities) { groupKeyOf(it.fullCid) in selected }
         val outcome = families.map { it to importFamily(it, now) }
 
+        // Anything Sellfox-sourced this run did not see has left the scope — its category
+        // was deselected, or the supplier dropped it. Hidden rather than deleted: the
+        // tier pricing an admin set hangs off these rows, and a category removed by
+        // mistake would otherwise cost all of it.
+        val imported = outcome
+            .filter { (_, result) -> result != Outcome.FAILED }
+            .mapNotNull { (family, _) -> runCatching { SpuCode(family.spuCode) }.getOrNull() }
+            .toSet()
+        val deactivated = products.deactivateSyncedProductsNotIn(imported)
+
         counts.wrote(outcome.count { (_, result) -> result != Outcome.FAILED })
         counts.skipped(commodities.size - families.sumOf { it.members.size })
 
@@ -112,6 +141,7 @@ class SellfoxSyncService(
             append("${families.size} products from ${selected.size} categor")
             append(if (selected.size == 1) "y" else "ies")
             append(" ($created new, $updated updated")
+            if (deactivated > 0) append(", $deactivated deactivated")
             if (rejected.isNotEmpty()) {
                 // Named, not just counted. "15 could not be built" tells an admin
                 // something is wrong and nothing about which product line to go and look

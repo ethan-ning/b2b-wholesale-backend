@@ -31,6 +31,7 @@ interface ProductJpaRepository : JpaRepository<ProductDO, Long> {
     ): List<ProductDO>
 
     fun countByStatus(status: String): Long
+    fun findBySourceAndStatus(source: String, status: String): List<ProductDO>
 
     @Query("SELECT DISTINCT p FROM ProductDO p JOIN p.categories c WHERE c.categoryId = :categoryId")
     fun findByCategoryId(@Param("categoryId") categoryId: Long): List<ProductDO>

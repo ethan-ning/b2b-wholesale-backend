@@ -76,7 +76,7 @@ class ProductRepositoryImpl(
         converter.applyTo(row, product)
         converter.applySyncedIdentity(row, product)
         converter.replaceVariants(row, product)
-        row.source = "SELLFOX"
+        row.source = SELLFOX_SOURCE
         row.createdAt = Instant.now()
         return converter.toDomain(jpa.save(row))
     }
@@ -91,8 +91,23 @@ class ProductRepositoryImpl(
         }
         converter.applySyncedIdentity(row, incoming)
         converter.replaceVariants(row, incoming)
-        row.source = "SELLFOX"
+        row.source = SELLFOX_SOURCE
         return converter.toDomain(jpa.save(row))
+    }
+
+    /**
+     * Compares in memory rather than with a NOT IN. The in-scope set is the whole imported
+     * catalog — thousands of codes once a couple of category groups are selected — and
+     * that is the wrong thing to send to Postgres as a literal list. The other side, the
+     * active Sellfox-sourced rows, is the small one.
+     */
+    override fun deactivateSyncedProductsNotIn(spuCodes: Set<SpuCode>): Int {
+        val keep = spuCodes.map { it.value }.toSet()
+        val stale = jpa.findBySourceAndStatus(SELLFOX_SOURCE, ProductStatus.ACTIVE.name)
+            .filterNot { it.spuCode in keep }
+        stale.forEach { it.status = ProductStatus.INACTIVE.name }
+        jpa.saveAll(stale)
+        return stale.size
     }
 
     override fun save(product: Product): Product {
@@ -145,6 +160,11 @@ class ProductRepositoryImpl(
      * Applied in memory because the window is taken here too — the whole result set is
      * already loaded. That is the same constraint the price view is meant to lift.
      */
+    private companion object {
+        /** Matches product.source; rows the portal owns are never touched by a sync. */
+        const val SELLFOX_SOURCE = "SELLFOX"
+    }
+
     private fun sorted(products: List<Product>, sort: ProductSort): List<Product> {
         val byField: Comparator<Product> = when (sort.field) {
             ProductSortField.SPU_CODE -> compareBy { it.spuCode.value }

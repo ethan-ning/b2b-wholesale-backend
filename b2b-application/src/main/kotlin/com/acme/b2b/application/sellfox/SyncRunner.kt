@@ -4,6 +4,7 @@ import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.sellfox.SellfoxSyncRun
 import com.acme.b2b.domain.sellfox.SellfoxSyncRunRepository
 import com.acme.b2b.domain.sellfox.SyncCounts
+import com.acme.b2b.domain.sellfox.SyncMode
 import com.acme.b2b.domain.sellfox.TriggerSource
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
@@ -25,6 +26,7 @@ class SyncRunner(
 ) {
 
     fun run(
+        mode: SyncMode,
         trigger: TriggerSource,
         triggeredBy: String?,
         work: (SyncCounts) -> String,
@@ -33,7 +35,7 @@ class SyncRunner(
             throw UseCaseViolation("A sync is already running")
         }
 
-        val started = begin(trigger, triggeredBy)
+        val started = begin(mode, trigger, triggeredBy)
         val counts = SyncCounts()
 
         return try {
@@ -46,8 +48,8 @@ class SyncRunner(
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun begin(trigger: TriggerSource, triggeredBy: String?): SellfoxSyncRun =
-        runs.save(SellfoxSyncRun.started(trigger, triggeredBy, clock.instant()))
+    fun begin(mode: SyncMode, trigger: TriggerSource, triggeredBy: String?): SellfoxSyncRun =
+        runs.save(SellfoxSyncRun.started(mode, trigger, triggeredBy, clock.instant()))
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun finish(run: SellfoxSyncRun): SellfoxSyncRun = runs.save(run)
