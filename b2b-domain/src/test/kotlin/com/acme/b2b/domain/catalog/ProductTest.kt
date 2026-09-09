@@ -6,6 +6,7 @@ import com.acme.b2b.types.VariantAxis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -73,5 +74,38 @@ class ProductTest {
         assertTrue(gloves.hasStock)
         assertTrue(gloves.requireVariant(gloves.variants.first().sku).stock.isOutOfStock)
         assertFalse(gloves.variants.last().stock.isOutOfStock)
+    }
+
+    @Test
+    fun `unfiling a category hands the primary slot to another`() {
+        val gloves = product(categoryIds = listOf(21, 22), primaryCategoryId = 22)
+
+        val unfiled = gloves.withoutCategory(22)
+
+        assertEquals(listOf(21L), unfiled.categoryIds)
+        assertEquals(21L, unfiled.primaryCategoryId)
+    }
+
+    @Test
+    fun `unfiling a non-primary category leaves the primary alone`() {
+        val gloves = product(categoryIds = listOf(21, 22), primaryCategoryId = 21)
+
+        val unfiled = gloves.withoutCategory(22)
+
+        assertEquals(listOf(21L), unfiled.categoryIds)
+        assertEquals(21L, unfiled.primaryCategoryId)
+    }
+
+    @Test
+    fun `unfiling the last category leaves the product filed nowhere`() {
+        val gloves = product(categoryIds = listOf(22), primaryCategoryId = 22)
+
+        val unfiled = gloves.withoutCategory(22)
+
+        assertTrue(unfiled.categoryIds.isEmpty())
+        assertNull(unfiled.primaryCategoryId)
+        // The product itself is untouched — a category is a shelf, not the stock on it.
+        assertEquals(gloves.spuCode, unfiled.spuCode)
+        assertEquals(gloves.variants.size, unfiled.variants.size)
     }
 }

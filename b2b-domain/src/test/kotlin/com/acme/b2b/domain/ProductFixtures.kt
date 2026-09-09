@@ -32,6 +32,8 @@ object ProductFixtures {
         basePrice: String = "18.00",
         axis: VariantAxis? = VariantAxis.SIZE,
         variants: List<ProductVariant> = listOf(variant("GL100-BLK-M", "M")),
+        categoryIds: List<Long> = listOf(22),
+        primaryCategoryId: Long? = 22,
     ) = Product(
         id = 1,
         spuCode = SpuCode(spuCode),
@@ -43,8 +45,8 @@ object ProductFixtures {
         variantAxis = axis,
         attributes = emptyMap(),
         status = ProductStatus.ACTIVE,
-        categoryIds = listOf(22),
-        primaryCategoryId = 22,
+        categoryIds = categoryIds,
+        primaryCategoryId = primaryCategoryId,
         imageUrls = emptyList(),
         variants = variants,
     )

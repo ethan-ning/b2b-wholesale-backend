@@ -31,6 +31,9 @@ interface ProductJpaRepository : JpaRepository<ProductDO, Long> {
     ): List<ProductDO>
 
     fun countByStatus(status: String): Long
+
+    @Query("SELECT DISTINCT p FROM ProductDO p JOIN p.categories c WHERE c.categoryId = :categoryId")
+    fun findByCategoryId(@Param("categoryId") categoryId: Long): List<ProductDO>
 }
 
 /**
@@ -77,10 +80,10 @@ interface CategoryJpaRepository : JpaRepository<CategoryDO, Long> {
 
 interface ProductCategoryJpaRepository : JpaRepository<ProductCategoryDO, Long> {
     fun findByCategoryIdIn(categoryIds: Collection<Long>): List<ProductCategoryDO>
-    fun existsByCategoryId(categoryId: Long): Boolean
 
-    @Query("SELECT pc.categoryId, COUNT(pc) FROM ProductCategoryDO pc GROUP BY pc.categoryId")
-    fun countsByCategory(): List<Array<Any>>
+    /** (categoryId, productId) pairs. Reads the FK column; no join to product. */
+    @Query("SELECT pc.categoryId, pc.product.id FROM ProductCategoryDO pc")
+    fun categoryProductPairs(): List<Array<Any>>
 }
 
 interface CustomerTierJpaRepository : JpaRepository<CustomerTierDO, Long>

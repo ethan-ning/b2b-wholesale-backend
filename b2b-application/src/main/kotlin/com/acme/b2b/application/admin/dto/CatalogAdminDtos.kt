@@ -27,11 +27,18 @@ data class CategoryNodeDTO(
     val slug: String,
     val parentId: Long?,
     val sortOrder: Int,
+    /** 1 for a root. Drives the level styling, and the depth limit. */
+    val depth: Int,
     /** Products filed directly under this node, not counting its sub-categories. */
     val productCount: Long,
+    /** Distinct products across this node and everything beneath it. */
+    val totalProductCount: Long,
+    /** False at the deepest allowed level, so the admin sees the ceiling before hitting it. */
+    val canAddChild: Boolean,
     /**
      * Whether this node can be deleted, and why not. The same rules the API enforces, so
      * the admin sees the outcome before pressing the button rather than after a 409.
+     * Products no longer block: deleting unfiles them.
      */
     val deletable: Boolean,
     val blockedReason: String?,

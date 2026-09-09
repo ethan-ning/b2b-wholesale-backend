@@ -36,6 +36,9 @@ class ProductRepositoryImpl(
     override fun findBySpuCode(spuCode: SpuCode): Product? =
         jpa.findBySpuCode(spuCode.value)?.let { converter.toDomain(it) }
 
+    override fun findByCategoryId(categoryId: Long): List<Product> =
+        jpa.findByCategoryId(categoryId).map { converter.toDomain(it) }
+
     override fun countAll(): Long = jpa.count()
 
     override fun countByStatus(status: ProductStatus): Long = jpa.countByStatus(status.name)

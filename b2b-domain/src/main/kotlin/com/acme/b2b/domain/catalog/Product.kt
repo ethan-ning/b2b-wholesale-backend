@@ -61,6 +61,21 @@ class Product(
         attributes, status, categoryIds, primaryCategoryId, imageUrls, variants,
     )
 
+    /**
+     * Unfiles this product from a category being deleted. If that category was the primary
+     * one, another of its categories takes over: a product with categories but no primary
+     * is filed everywhere and placed nowhere.
+     */
+    fun withoutCategory(categoryId: Long): Product {
+        val remaining = categoryIds.filterNot { it == categoryId }
+        return Product(
+            id, spuCode, name, brand, description, baseWholesalePrice, locationCode, variantAxis,
+            attributes, status, remaining,
+            if (primaryCategoryId == categoryId) remaining.firstOrNull() else primaryCategoryId,
+            imageUrls, variants,
+        )
+    }
+
     fun variant(sku: SkuCode): ProductVariant? = variants.firstOrNull { it.sku == sku }
 
     fun requireVariant(sku: SkuCode): ProductVariant =

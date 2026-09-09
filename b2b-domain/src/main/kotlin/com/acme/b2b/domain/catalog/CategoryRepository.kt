@@ -10,6 +10,15 @@ data class Category(
     val children: List<Category> = emptyList(),
 ) {
     init { require(name.isNotBlank()) { "Category name must not be blank" } }
+
+    companion object {
+        /**
+         * Root, sub, sub-sub. A fourth level buys precision nobody browses to — dealers
+         * stop drilling well before it, and every extra level is one more place a product
+         * can be filed where it will not be found.
+         */
+        const val MAX_DEPTH = 3
+    }
 }
 
 interface CategoryRepository {
@@ -21,13 +30,15 @@ interface CategoryRepository {
 
     fun hasChildren(categoryId: Long): Boolean
 
+    /** 1 for a root. Used to hold the tree to [Category.MAX_DEPTH]. */
+    fun depthOf(categoryId: Long): Int
+
     /**
-     * Products filed directly under each category, for the whole tree in one query.
-     * Returned as a map rather than a per-node call so rendering the tree does not become
-     * one query per node.
+     * Which products are filed under each category, for the whole tree in one query.
+     * Ids rather than counts because a parent's total is the *distinct* products across
+     * its subtree: a product filed under both "Apparel" and "Apparel > Gloves" is one
+     * product, and summing counts would report it twice.
      */
-    fun productCountsByCategory(): Map<Long, Long>
-    /** True when any product is filed under it — deleting would orphan them. */
-    fun isAssignedToProducts(categoryId: Long): Boolean
+    fun productIdsByCategory(): Map<Long, Set<Long>>
     fun existsBySlug(slug: String): Boolean
 }

@@ -4,6 +4,7 @@ import com.acme.b2b.application.admin.dto.CategoryNodeDTO
 import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.catalog.Category
 import com.acme.b2b.domain.catalog.CategoryRepository
+import com.acme.b2b.domain.catalog.ProductRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.text.Normalizer
@@ -16,16 +17,17 @@ import java.text.Normalizer
 @Transactional(readOnly = true)
 class CategoryAdminService(
     private val categories: CategoryRepository,
+    private val products: ProductRepository,
 ) {
 
     /**
-     * The tree, annotated with what an admin needs before acting: how many products sit in
-     * each node, and whether it can be deleted. Counts come from one query for the whole
-     * tree, so this does not become one query per node.
+     * The tree, annotated with what an admin needs before acting: what is filed in each
+     * node and beneath it, how deep it sits, and whether it can take a child. All of it
+     * from one products query for the whole tree, not one per node.
      */
     fun tree(): List<CategoryNodeDTO> {
-        val counts = categories.productCountsByCategory()
-        return categories.findTree().map { it.toDto(counts) }
+        val productIds = categories.productIdsByCategory()
+        return categories.findTree().map { it.toDto(productIds, depth = 1).first }
     }
 
     @Transactional
@@ -33,15 +35,23 @@ class CategoryAdminService(
         val name = command.name.trim()
         if (name.isBlank()) throw UseCaseViolation("Category name must not be blank")
 
-        command.parentId?.let {
-            categories.findById(it) ?: throw UseCaseViolation("No such parent category: $it")
+        command.parentId?.let { parentId ->
+            categories.findById(parentId)
+                ?: throw UseCaseViolation("No such parent category: $parentId")
+            val parentDepth = categories.depthOf(parentId)
+            if (parentDepth >= Category.MAX_DEPTH) {
+                throw UseCaseViolation(
+                    "Categories go ${Category.MAX_DEPTH} levels deep at most; " +
+                        "this parent is already at level $parentDepth"
+                )
+            }
         }
 
         val slug = uniqueSlug(name)
         val saved = categories.save(
             Category(id = null, name = name, slug = slug, parentId = command.parentId, sortOrder = 0)
         )
-        return saved.toDto()
+        return nodeOf(requireNotNull(saved.id))
     }
 
     @Transactional
@@ -53,12 +63,17 @@ class CategoryAdminService(
         if (name.isBlank()) throw UseCaseViolation("Category name must not be blank")
 
         // The slug is left alone: it may already be in a URL a dealer has bookmarked.
-        return categories.save(existing.copy(name = name)).toDto()
+        categories.save(existing.copy(name = name))
+        return nodeOf(id)
     }
 
     /**
-     * Refuses rather than cascades. Deleting a branch would silently unfile every
-     * product beneath it, and the admin cannot see that from the button they pressed.
+     * Deletes a leaf, unfiling whatever was in it. Products are not deleted — losing a
+     * category is losing a shelf, not the stock on it — so each one is asked to drop the
+     * link, which also hands the primary slot to another of its categories if this was it.
+     *
+     * Sub-categories still block: removing a branch would take nodes with it that the
+     * admin never saw, and the count on the button does not tell them which.
      */
     @Transactional
     fun delete(id: Long) {
@@ -67,10 +82,20 @@ class CategoryAdminService(
         if (categories.hasChildren(id)) {
             throw UseCaseViolation("Category $id has sub-categories; remove or move them first")
         }
-        if (categories.isAssignedToProducts(id)) {
-            throw UseCaseViolation("Category $id still has products filed under it")
-        }
+
+        products.findByCategoryId(id).forEach { products.save(it.withoutCategory(id)) }
         categories.deleteById(id)
+    }
+
+    /**
+     * Reads one node back out of the freshly built tree. A node's depth, counts and
+     * deletability are all facts about its position, and the row a save returns does not
+     * know its own position.
+     */
+    private fun nodeOf(id: Long): CategoryNodeDTO {
+        fun find(nodes: List<CategoryNodeDTO>): CategoryNodeDTO? =
+            nodes.firstOrNull { it.id == id } ?: nodes.firstNotNullOfOrNull { find(it.children) }
+        return find(tree()) ?: throw NoSuchElementException("No category with id $id")
     }
 
     /** "Auto Parts" -> "auto-parts", with a numeric suffix if that is taken. */
@@ -88,24 +113,40 @@ class CategoryAdminService(
             .first { !categories.existsBySlug(it) }
     }
 
-    private fun Category.toDto(counts: Map<Long, Long> = emptyMap()): CategoryNodeDTO {
-        val productCount = id?.let { counts[it] } ?: 0
-        // Mirrors delete()'s rules, so the button's state and the API agree.
-        val blockedReason = when {
-            children.isNotEmpty() -> "Has ${children.size} sub-categor${if (children.size == 1) "y" else "ies"}"
-            productCount > 0 -> "Has $productCount product${if (productCount == 1L) "" else "s"}"
-            else -> null
-        }
-        return CategoryNodeDTO(
+    /**
+     * Returns the node alongside the distinct products in its subtree — the caller needs
+     * the set to roll up into its own, but it is working state, not something to put on
+     * the wire.
+     */
+    private fun Category.toDto(
+        productIds: Map<Long, Set<Long>>,
+        depth: Int,
+    ): Pair<CategoryNodeDTO, Set<Long>> {
+        val children = children.map { it.toDto(productIds, depth + 1) }
+        val direct = id?.let { productIds[it] }.orEmpty()
+
+        // Union, not sum: a product filed under both a parent and its child is one
+        // product, and an admin reading "12 total" means twelve things.
+        val subtree = direct + children.flatMap { (_, ids) -> ids }
+
+        // Mirrors delete()'s only remaining rule, so the button's state and the API agree.
+        val blockedReason = if (children.isEmpty()) null else
+            "Has ${children.size} sub-categor${if (children.size == 1) "y" else "ies"}"
+
+        val dto = CategoryNodeDTO(
             id = id,
             name = name,
             slug = slug,
             parentId = parentId,
             sortOrder = sortOrder,
-            productCount = productCount,
+            depth = depth,
+            productCount = direct.size.toLong(),
+            totalProductCount = subtree.size.toLong(),
+            canAddChild = depth < Category.MAX_DEPTH,
             deletable = blockedReason == null,
             blockedReason = blockedReason,
-            children = children.map { it.toDto(counts) },
+            children = children.map { (child, _) -> child },
         )
+        return dto to subtree
     }
 }

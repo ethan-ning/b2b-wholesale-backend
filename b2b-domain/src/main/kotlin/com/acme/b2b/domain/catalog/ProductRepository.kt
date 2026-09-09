@@ -16,6 +16,8 @@ interface ProductRepository {
     fun findById(id: Long): Product?
     fun findBySpuCode(spuCode: SpuCode): Product?
     fun search(criteria: ProductSearchCriteria, page: Page): PageOf<Product>
+    /** Everything filed under one category, so deleting it can unfile them first. */
+    fun findByCategoryId(categoryId: Long): List<Product>
     fun save(product: Product): Product
 
     fun countAll(): Long

@@ -20,15 +20,24 @@ class CategoryRepositoryImpl(
 
     override fun hasChildren(categoryId: Long): Boolean = jpa.existsByParentId(categoryId)
 
-    override fun isAssignedToProducts(categoryId: Long): Boolean =
-        productCategories.existsByCategoryId(categoryId)
-
     override fun existsBySlug(slug: String): Boolean = jpa.existsBySlug(slug)
 
-    override fun productCountsByCategory(): Map<Long, Long> =
-        productCategories.countsByCategory().associate { (categoryId, count) ->
-            categoryId as Long to (count as Number).toLong()
+    override fun depthOf(categoryId: Long): Int {
+        val parentOf = jpa.findAll().associate { it.id to it.parentId }
+        var depth = 1
+        var cursor = parentOf[categoryId]
+        // Bounded by the node count: a cycle would otherwise spin here forever.
+        while (cursor != null && depth <= parentOf.size) {
+            depth++
+            cursor = parentOf[cursor]
         }
+        return depth
+    }
+
+    override fun productIdsByCategory(): Map<Long, Set<Long>> =
+        productCategories.categoryProductPairs()
+            .groupBy({ it[0] as Long }, { it[1] as Long })
+            .mapValues { (_, ids) -> ids.toSet() }
 
     override fun findTree(): List<Category> {
         val all = jpa.findAll()
@@ -69,5 +78,14 @@ class CategoryRepositoryImpl(
         return category.copy(id = saved.id)
     }
 
-    override fun deleteById(id: Long) = jpa.deleteById(id)
+    /**
+     * Flushes first. The caller unfiles this category's products immediately before
+     * calling here, and those orphan deletes are still sitting in the persistence
+     * context — leaving the FK from product_category to be violated by a category
+     * delete that Hibernate is free to write out first.
+     */
+    override fun deleteById(id: Long) {
+        jpa.flush()
+        jpa.deleteById(id)
+    }
 }
