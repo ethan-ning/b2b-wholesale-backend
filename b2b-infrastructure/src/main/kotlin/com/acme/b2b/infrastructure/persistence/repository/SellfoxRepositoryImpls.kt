@@ -109,6 +109,7 @@ class SellfoxSkuLinkRepositoryImpl(
                 baseSellfoxSku = link.baseSellfoxSku,
                 baseQuantity = link.baseQuantity,
                 commodityName = link.commodityName,
+                weightGrams = link.weightGrams?.toBigDecimal(),
                 lastSeenAt = link.lastSeenAt,
             )
         )
@@ -123,13 +124,16 @@ class SellfoxSkuLinkRepositoryImpl(
             baseSellfoxSku = it.baseSellfoxSku,
             baseQuantity = it.baseQuantity,
             commodityName = it.commodityName.orEmpty(),
+            weightGrams = it.weightGrams?.toDouble(),
             lastSeenAt = it.lastSeenAt,
         )
     }
 
-    override fun skusFor(fullCids: Set<String>): Set<String> =
-        if (fullCids.isEmpty()) emptySet()
-        else jpa.findByFullCidIn(fullCids).map { it.sellfoxSku }.toSet()
+    override fun deleteSkusNotIn(keep: Set<String>): Int {
+        val stale = jpa.findAll().filterNot { it.sellfoxSku in keep }
+        jpa.deleteAll(stale)
+        return stale.size
+    }
 }
 
 @Repository

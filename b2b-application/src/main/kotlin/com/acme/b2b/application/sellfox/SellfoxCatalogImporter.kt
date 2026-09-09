@@ -1,37 +1,40 @@
 package com.acme.b2b.application.sellfox
 
-import com.acme.b2b.domain.catalog.Product
-import com.acme.b2b.domain.catalog.ProductRepository
-import com.acme.b2b.domain.catalog.ProductStatus
-import com.acme.b2b.domain.catalog.ProductVariant
-import com.acme.b2b.domain.catalog.StockLevel
-import com.acme.b2b.domain.sellfox.*
-import com.acme.b2b.types.Money
-import com.acme.b2b.types.PackQuantity
-import com.acme.b2b.types.SkuCode
-import com.acme.b2b.types.SpuCode
+import com.acme.b2b.domain.sellfox.SellfoxCatalogPort
+import com.acme.b2b.domain.sellfox.SellfoxCategoryScope
+import com.acme.b2b.domain.sellfox.SellfoxCommodity
+import com.acme.b2b.domain.sellfox.SellfoxScopeRepository
+import com.acme.b2b.domain.sellfox.SellfoxSkuLink
+import com.acme.b2b.domain.sellfox.SellfoxSkuLinkRepository
+import com.acme.b2b.domain.sellfox.SyncCounts
 import org.springframework.stereotype.Component
-import java.math.BigDecimal
-import java.math.RoundingMode
 import java.time.Instant
 
 /**
- * Turns the commodities in the selected categories into products.
+ * Records what Sellfox says. Nothing more.
  *
- * Also rebuilds the category registry from what it saw, because Sellfox exposes no
- * category endpoint — every commodity carries the full path of ids and names, so the tree
- * is only recoverable from the commodities themselves. That is why a first run on a fresh
- * install imports nothing and simply fills the picker.
+ * This step does not group and does not touch a product. It fetches the catalog, refreshes
+ * the category registry, and writes one row per in-scope SKU describing what the commodity
+ * declared — its SPU if it has one, the SKU it packs and how many, its name and weight.
+ *
+ * Keeping it to facts is the point. Grouping used to happen here too, because a product
+ * cannot be built without it, and the result was two places deciding how SKUs relate: this
+ * one at import time and the regroup step afterwards. One of them was always the stale
+ * answer. Now [SpuRegrouper] is the only code that groups, and it works from these rows.
+ *
+ * The registry is rebuilt from the scan because Sellfox exposes no category endpoint —
+ * every commodity carries the full path of ids and names, so the tree is only recoverable
+ * from the commodities themselves. That is why a first run on a fresh install records
+ * nothing and simply fills the picker.
  */
 @Component
 class SellfoxCatalogImporter(
     private val sellfox: SellfoxCatalogPort,
     private val scope: SellfoxScopeRepository,
-    private val products: ProductRepository,
     private val links: SellfoxSkuLinkRepository,
 ) {
 
-    fun import(counts: SyncCounts, now: Instant): String {
+    fun recordFacts(counts: SyncCounts, now: Instant): String {
         val commodities = sellfox.listCommodities()
         counts.read(commodities.size)
 
@@ -40,50 +43,43 @@ class SellfoxCatalogImporter(
         val selected = scope.selectedCategoryIds()
         if (selected.isEmpty()) {
             counts.skipped(commodities.size)
-            return "Discovered ${scope.categories().size} category groups; none selected, so nothing imported."
+            return "Discovered ${scope.categories().size} category groups; none selected, so nothing recorded."
         }
 
-        val families = SpuGrouping.group(commodities) { groupKeyOf(it.fullCid) in selected }
-        val outcome = families.associateWith { importFamily(it, now) }
+        val inScope = commodities.filter { it.isActive && groupKeyOf(it.fullCid) in selected }
+        inScope.forEach { links.save(it.toLink(now)) }
 
-        // Anything Sellfox-sourced this run did not see has left the scope — its category
-        // was deselected, or the supplier dropped it.
-        val kept = outcome
-            .filterValues { it != Outcome.FAILED }
-            .keys.filter { it.hasUsableCode() }
-            .map { SpuCode(it.spuCode) }
-            .toSet()
-        val deactivated = products.deactivateSyncedProductsNotIn(kept)
+        // Whatever this run did not see has left the scope. Forgetting it here is what
+        // lets the regroup step deactivate the products it used to hold: it groups the
+        // links that survive, and a product with none left is out of scope.
+        val forgotten = links.deleteSkusNotIn(inScope.map { it.sku }.toSet())
 
-        counts.wrote(outcome.count { (_, result) -> result != Outcome.FAILED })
-        counts.skipped(commodities.size - families.sumOf { it.members.size })
+        counts.wrote(inScope.size)
+        counts.skipped(commodities.size - inScope.size)
 
-        return summarise(families.size, selected.size, outcome, deactivated)
+        return buildString {
+            append("${inScope.size} SKUs recorded from ${selected.size} categor")
+            append(if (selected.size == 1) "y" else "ies")
+            if (forgotten > 0) append(", $forgotten no longer in scope")
+            append(".")
+        }
     }
 
-    private fun summarise(
-        familyCount: Int,
-        categoryCount: Int,
-        outcome: Map<SpuGrouping.Family, Outcome>,
-        deactivated: Int,
-    ): String {
-        val rejected = outcome.filterValues { it == Outcome.FAILED }.keys.map { it.spuCode }
-        return buildString {
-            append("$familyCount products from $categoryCount categor")
-            append(if (categoryCount == 1) "y" else "ies")
-            append(" (${outcome.count { it.value == Outcome.CREATED }} new")
-            append(", ${outcome.count { it.value == Outcome.UPDATED }} updated")
-            outcome.count { it.value == Outcome.DEFERRED }.takeIf { it > 0 }?.let { append(", $it regrouped") }
-            deactivated.takeIf { it > 0 }?.let { append(", $it deactivated") }
-            if (rejected.isNotEmpty()) {
-                // Named, not just counted: "15 could not be built" says something is wrong
-                // and nothing about which product line to go and look at.
-                append(", ${rejected.size} rejected: ")
-                append(rejected.take(REJECTS_NAMED).joinToString(", "))
-                if (rejected.size > REJECTS_NAMED) append(" and ${rejected.size - REJECTS_NAMED} more")
-            }
-            append(").")
-        }
+    private fun SellfoxCommodity.toLink(now: Instant): SellfoxSkuLink {
+        // The commodity's own declaration, never a conclusion drawn from it. A regroup has
+        // to start from the same inputs rather than from the last answer.
+        val child = children.singleOrNull()
+        return SellfoxSkuLink(
+            sellfoxSku = sku,
+            commodityId = commodityId,
+            fullCid = fullCid,
+            declaredSpu = declaredSpu,
+            baseSellfoxSku = child?.sku,
+            baseQuantity = child?.quantity,
+            commodityName = name,
+            weightGrams = weightGrams,
+            lastSeenAt = now,
+        )
     }
 
     private fun discoverCategories(commodities: List<SellfoxCommodity>): List<SellfoxCategoryScope> =
@@ -113,99 +109,8 @@ class SellfoxCatalogImporter(
     private fun groupNameOf(fullName: String): String =
         fullName.split('/').take(GROUP_DEPTH).joinToString("/")
 
-    private fun importFamily(family: SpuGrouping.Family, now: Instant): Outcome {
-        // Recorded first, and whatever happens to the product. These are the facts the
-        // commodity stated and a regroup starts from them, so a family that defers its
-        // filing must not also defer saying what it knows.
-        family.members.forEach { member ->
-            val child = member.commodity.children.singleOrNull()
-            links.save(
-                SellfoxSkuLink(
-                    sellfoxSku = member.commodity.sku,
-                    commodityId = member.commodity.commodityId,
-                    fullCid = member.commodity.fullCid,
-                    declaredSpu = member.commodity.declaredSpu,
-                    baseSellfoxSku = child?.sku,
-                    baseQuantity = child?.quantity,
-                    commodityName = member.commodity.name,
-                    lastSeenAt = now,
-                )
-            )
-        }
-
-        val product = try {
-            buildProduct(family, now)
-        } catch (ex: IllegalArgumentException) {
-            // A SKU the catalog refuses. Counted rather than thrown: one bad row must not
-            // abandon the other six thousand, and the summary names what was dropped.
-            return Outcome.FAILED
-        }
-
-        // A SKU sits under exactly one product, so a changed grouping means moving it, not
-        // inserting it — which would trip the unique key and abandon the run.
-        val filedElsewhere = products.skusFiledElsewhere(
-            product.spuCode,
-            product.variants.map { it.sku.value }.toSet(),
-        )
-        if (filedElsewhere.isNotEmpty()) return Outcome.DEFERRED
-
-        val existing = products.findBySpuCode(product.spuCode)
-        if (existing == null) products.create(product) else products.saveSynced(product, existing)
-        return if (existing == null) Outcome.CREATED else Outcome.UPDATED
-    }
-
-    private fun buildProduct(family: SpuGrouping.Family, now: Instant) = Product(
-        id = null,
-        spuCode = SpuCode(family.spuCode),
-        name = family.name,
-        brand = null,
-        description = null,
-        // No dealer price exists yet. Importing at zero and leaving the product INACTIVE is
-        // what keeps an unpriced product out of the catalog; the admin prices it and turns
-        // it on.
-        baseWholesalePrice = Money.ZERO,
-        locationCode = null,
-        variantAxis = family.axis?.toVariantAxis(),
-        attributes = emptyMap(),
-        status = ProductStatus.INACTIVE,
-        categoryIds = emptyList(),
-        primaryCategoryId = null,
-        imageUrls = emptyList(),
-        variants = family.members.mapIndexed { index, member ->
-            ProductVariant(
-                id = null,
-                sku = SkuCode(member.commodity.sku),
-                variantValue = member.variantValue,
-                packQuantity = PackQuantity(member.packQuantity),
-                // MAP and price are the portal's to set; Sellfox has neither.
-                mapPrice = null,
-                upc = null,
-                weight = member.commodity.weightGrams?.let { grams ->
-                    BigDecimal.valueOf(grams).divide(GRAMS_PER_KILO, 3, RoundingMode.HALF_UP)
-                },
-                sortOrder = index,
-                active = true,
-                // Filled in by the stock step of this same run.
-                stock = StockLevel.empty(now),
-            )
-        },
-    )
-
-    private enum class Outcome {
-        CREATED,
-        UPDATED,
-        /** Left to the regroup step, which is the only path that can move a SKU. */
-        DEFERRED,
-        FAILED,
-    }
-
     private companion object {
-        val GRAMS_PER_KILO: BigDecimal = BigDecimal(1000)
-
         /** Categories are chosen two levels down — see SellfoxCategoryScope. */
         const val GROUP_DEPTH = 2
-
-        /** Enough to act on; the run summary is a line, not a report. */
-        const val REJECTS_NAMED = 8
     }
 }

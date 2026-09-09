@@ -6,7 +6,9 @@ import com.acme.b2b.domain.catalog.ProductStockRepository
 import com.acme.b2b.domain.catalog.RegroupOutcome
 import com.acme.b2b.domain.catalog.RegroupedFamily
 import com.acme.b2b.domain.catalog.SkuStockUpdate
+import com.acme.b2b.domain.catalog.RegroupedSku
 import com.acme.b2b.infrastructure.persistence.entity.ProductDO
+import com.acme.b2b.infrastructure.persistence.entity.ProductVariantDO
 import com.acme.b2b.infrastructure.persistence.jpa.ProductJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository
 import org.springframework.stereotype.Repository
@@ -44,68 +46,114 @@ class ProductStockRepositoryImpl(
  * products cannot be expressed as saving one aggregate, and the unique constraint on
  * product_variant.sku means the move has to be a reparent rather than an insert-then-delete.
  */
+/**
+ * Materialises the grouping: creates the products and SKUs it names, moves any SKU that
+ * has changed product, and clears out whatever is left holding nothing.
+ *
+ * Row level rather than through the Product aggregate. A SKU moving between products
+ * cannot be expressed as saving one aggregate, and the unique constraint on
+ * product_variant.sku makes the move a reparent rather than an insert-then-delete.
+ */
 @Repository
 class ProductGroupingRepositoryImpl(
     private val products: ProductJpaRepository,
     private val variants: ProductVariantJpaRepository,
 ) : ProductGroupingRepository {
 
-    override fun regroup(
-        families: List<RegroupedFamily>,
-    ): RegroupOutcome {
-        val bySpu = products.findBySourceIn(listOf(SELLFOX)).associateBy { it.spuCode }
-        var created = 0
-        var moved = 0
+    override fun regroup(families: List<RegroupedFamily>): RegroupOutcome {
+        val bySpu = products.findBySourceIn(listOf(SELLFOX)).associateBy { it.spuCode }.toMutableMap()
+        val existingRows = variants
+            .findBySkuIn(families.flatMap { family -> family.members.map { it.sku } })
+            .associateBy { it.sku }
+
+        var productsCreated = 0
+        var skusCreated = 0
+        var skusMoved = 0
 
         families.forEach { family ->
-            val target = bySpu[family.spuCode] ?: run {
-                created++
-                products.save(
-                    ProductDO(
-                        spuCode = family.spuCode,
-                        name = family.name,
-                        source = SELLFOX,
-                        // Imported products are inactive until priced, and a product this
-                        // run invents has never been priced.
-                        status = ProductStatus.INACTIVE.name,
-                        createdAt = Instant.now(),
-                        updatedAt = Instant.now(),
-                    )
-                )
+            val target = bySpu[family.spuCode] ?: newProduct(family).also {
+                bySpu[family.spuCode] = it
+                productsCreated++
             }
-            target.variantAxis = family.axis?.label
             target.name = family.name
+            target.variantAxis = family.axis?.label
             target.updatedAt = Instant.now()
             products.save(target)
 
             family.members.forEach { member ->
-                val row = variants.findBySkuIn(listOf(member.sku)).firstOrNull() ?: return@forEach
+                val row = existingRows[member.sku]
+                if (row == null) {
+                    variants.save(newVariant(target, member))
+                    skusCreated++
+                    return@forEach
+                }
                 if (row.product?.id != target.id) {
                     row.product = target
-                    moved++
+                    skusMoved++
                 }
                 row.variantValue = member.variantValue
                 row.packQuantity = member.packQuantity
                 row.sortOrder = member.sortOrder
+                row.weight = member.weight ?: row.weight
+                row.status = ACTIVE
                 variants.save(row)
             }
         }
 
-        // Flush the reparenting before looking for empties: the rows that left are still
-        // pending, so a product would otherwise still look occupied by SKUs it has lost.
+        // Flushed before looking for empties: the rows that left are still pending, so a
+        // product would otherwise look occupied by SKUs it has lost.
         variants.flush()
-
         val emptied = products.findBySourceIn(listOf(SELLFOX)).filter { it.variants.isEmpty() }
         products.deleteAll(emptied)
 
         return RegroupOutcome(
-            productsCreated = created,
-            skusMoved = moved,
+            productsCreated = productsCreated,
+            skusCreated = skusCreated,
+            skusMoved = skusMoved,
             emptyProductsRemoved = emptied.size,
         )
     }
 
+    override fun deactivateProductsNotIn(spuCodes: Set<String>): Int {
+        val stale = products
+            .findBySourceAndStatus(SELLFOX, ProductStatus.ACTIVE.name)
+            .filterNot { it.spuCode in spuCodes }
+        stale.forEach {
+            it.status = ProductStatus.INACTIVE.name
+            it.updatedAt = Instant.now()
+        }
+        products.saveAll(stale)
+        return stale.size
+    }
+
+    /**
+     * A product this run invents has never been priced, and an unpriced product must not
+     * reach a dealer at $0.00 — so it arrives inactive, like every ERP import.
+     */
+    private fun newProduct(family: RegroupedFamily) = products.save(
+        ProductDO(
+            spuCode = family.spuCode,
+            name = family.name,
+            source = SELLFOX,
+            status = ProductStatus.INACTIVE.name,
+            variantAxis = family.axis?.label,
+            createdAt = Instant.now(),
+            updatedAt = Instant.now(),
+        )
+    )
+
+    private fun newVariant(product: ProductDO, member: RegroupedSku) = ProductVariantDO(
+        product = product,
+        sku = member.sku,
+        variantValue = member.variantValue,
+        packQuantity = member.packQuantity,
+        sortOrder = member.sortOrder,
+        weight = member.weight,
+        status = ACTIVE,
+    )
+
     private companion object {
         const val SELLFOX = "SELLFOX"
+        const val ACTIVE = "ACTIVE"
     }
 }

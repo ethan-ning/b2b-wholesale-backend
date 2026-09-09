@@ -9,9 +9,9 @@ spring:
     # Adds a sample catalog on top of the real migrations. Production never lists this
     # location, so the seed cannot reach it.
     locations: classpath:db/migration,classpath:db/seed
-    # The seeds sit at V900+ to stay clear of real migrations, which means every new
-    # real migration arrives "before" them and Flyway would refuse it. Allowed here
-    # only: production has no seeds, so its migrations stay strictly ordered.
+    # The seed sits at V900 to stay clear of real migrations, so a migration added later
+    # arrives "before" it and Flyway would otherwise refuse. Allowed here only:
+    # production has no seed, so its migrations stay strictly ordered.
     out-of-order: true
 
   datasource:

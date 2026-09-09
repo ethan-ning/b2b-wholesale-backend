@@ -165,7 +165,9 @@ object SpuGrouping {
             spuCode = spuCodeFor(members.map { it.commodity.sku }, baseSku, allSkus),
             name = describedBy.name.ifBlank { baseSku },
             fullCid = describedBy.fullCid,
-            members = members.map { it.copy(variantValue = "${it.packQuantity}") },
+            members = members.map {
+                it.copy(variantValue = if (members.size > 1) "${it.packQuantity}" else null)
+            },
             axis = if (members.size > 1) Axis.PACK_QUANTITY else null,
             basis = if (members.size > 1) Basis.DECLARED_PACK else Basis.SINGLE,
         )
@@ -295,7 +297,9 @@ object SpuGrouping {
 
         return family.copy(
             spuCode = pack.stem,
-            members = family.members.map { it.copy(packQuantity = pack.quantity, isBase = pack.quantity == 1) },
+            members = family.members.map {
+                it.copy(packQuantity = pack.quantity, isBase = pack.quantity == 1, variantValue = null)
+            },
         )
     }
 

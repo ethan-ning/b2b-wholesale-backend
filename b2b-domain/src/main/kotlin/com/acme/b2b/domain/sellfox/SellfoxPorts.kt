@@ -75,7 +75,15 @@ data class SellfoxWarehouseScope(
 interface SellfoxSkuLinkRepository {
     fun save(link: SellfoxSkuLink)
     fun findAll(): List<SellfoxSkuLink>
-    fun skusFor(fullCids: Set<String>): Set<String>
+
+    /**
+     * Forgets SKUs an import no longer saw — their category left the scope, or the
+     * supplier dropped them. Returns how many went.
+     *
+     * This is what makes the regroup step able to deactivate: it groups whatever links
+     * survive, and a product with none left is one the scope no longer covers.
+     */
+    fun deleteSkusNotIn(keep: Set<String>): Int
 }
 
 /**
@@ -96,5 +104,7 @@ data class SellfoxSkuLink(
     /** How many of [baseSellfoxSku] this SKU holds. */
     val baseQuantity: Int?,
     val commodityName: String,
+    /** The only variant field grouping does not produce, so it has to be recorded. */
+    val weightGrams: Double?,
     val lastSeenAt: Instant,
 )

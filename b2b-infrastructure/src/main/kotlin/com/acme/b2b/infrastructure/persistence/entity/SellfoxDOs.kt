@@ -66,8 +66,11 @@ class SellfoxSkuLinkDO(
     @Column(name = "base_quantity")
     var baseQuantity: Int? = null,
 
-    @Column(name = "commodity_name")
-    var commodityName: String? = null,
+    @Column(name = "commodity_name", nullable = false)
+    var commodityName: String = "",
+
+    @Column(name = "weight_grams")
+    var weightGrams: java.math.BigDecimal? = null,
 
     @Column(name = "last_seen_at", nullable = false)
     var lastSeenAt: Instant = Instant.EPOCH,

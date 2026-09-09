@@ -25,19 +25,20 @@ class SellfoxSyncService(
 ) {
 
     /**
-     * Import what is in scope, re-file it, hide what has left, then count what remains.
+     * Facts, then structure, then numbers.
      *
-     * The order is the whole design. Products first, so a SKU this run imports gets its
-     * stock from the same run; regrouping next, because the import files one family at a
-     * time and cannot move a SKU another product still owns; stock last, so a product on
-     * its way out is not counted on its way past.
+     * Three steps that each do one thing, in the only order that works. The import records
+     * what Sellfox says and nothing else; the regroup turns those facts into products —
+     * it is the only step that decides how SKUs relate; the stock pass counts what the
+     * regroup just placed, which is why a SKU imported by this run has its stock by the
+     * end of it.
      */
     fun syncFull(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun {
         requireScopeChosen()
         return runner.run(SyncMode.FULL, trigger, triggeredBy) { counts ->
             val now = clock.instant()
             listOf(
-                catalog.import(counts, now),
+                catalog.recordFacts(counts, now),
                 regrouper.regroup(counts),
                 stock.refresh(counts, now),
             ).joinToString(" ")

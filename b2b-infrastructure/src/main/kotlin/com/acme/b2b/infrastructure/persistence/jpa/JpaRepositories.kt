@@ -129,9 +129,7 @@ interface SellfoxWarehouseJpaRepository : JpaRepository<SellfoxWarehouseDO, Long
     fun findBySelectedTrue(): List<SellfoxWarehouseDO>
 }
 
-interface SellfoxSkuLinkJpaRepository : JpaRepository<SellfoxSkuLinkDO, String> {
-    fun findByFullCidIn(fullCids: Collection<String>): List<SellfoxSkuLinkDO>
-}
+interface SellfoxSkuLinkJpaRepository : JpaRepository<SellfoxSkuLinkDO, String>
 
 interface SellfoxSyncRunJpaRepository : JpaRepository<SellfoxSyncRunDO, Long> {
     fun findAllByOrderByStartedAtDesc(pageable: Pageable): List<SellfoxSyncRunDO>

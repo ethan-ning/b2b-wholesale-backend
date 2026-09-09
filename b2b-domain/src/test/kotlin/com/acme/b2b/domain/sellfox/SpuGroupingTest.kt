@@ -177,8 +177,9 @@ class SpuGroupingTest {
 
         assertEquals(listOf("NDR12-RED", "NDR12-YELLOW"), families.map { it.spuCode })
         assertTrue(families.all { it.members.single().packQuantity == 10 })
-        // One SKU varies along nothing.
+        // One SKU varies along nothing — no axis, and no value on one.
         assertTrue(families.all { it.axis == null })
+        assertTrue(families.all { it.members.single().variantValue == null })
     }
 
     @Test

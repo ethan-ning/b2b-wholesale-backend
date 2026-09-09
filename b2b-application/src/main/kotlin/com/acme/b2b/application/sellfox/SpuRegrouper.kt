@@ -9,13 +9,20 @@ import com.acme.b2b.domain.sellfox.SellfoxSkuLinkRepository
 import com.acme.b2b.domain.sellfox.SpuGrouping
 import com.acme.b2b.domain.sellfox.SyncCounts
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 /**
- * Recomputes which SKUs belong to which product, from what is already imported.
+ * The only place SPU grouping happens.
  *
- * Grouping is a calculation over facts a sync recorded — the declared SPU, the declared
- * pack children, the SKU codes — so when the calculation improves, the catalog is wrong
- * in a way that needs no new facts to put right.
+ * Everything it needs is in `sellfox_sku_link` — what each commodity declared about
+ * itself. That is deliberate on both sides: it means grouping can be recomputed without
+ * calling Sellfox, and it means the calculation can never come to depend on the answer a
+ * previous run gave, which reading pack quantity back off a variant row would do.
+ *
+ * The import step records those facts and stops. This step decides the structure: which
+ * products exist, which SKUs sit under each, and which products the scope no longer
+ * covers. Nothing else in the system arranges SKUs into products.
  */
 @Component
 class SpuRegrouper(
@@ -26,34 +33,48 @@ class SpuRegrouper(
     fun regroup(counts: SyncCounts): String {
         val recorded = links.findAll()
         counts.read(recorded.size)
-        if (recorded.isEmpty()) return "Nothing imported yet, so there was nothing to regroup."
+        if (recorded.isEmpty()) return "Nothing recorded yet, so there was nothing to group."
 
-        // Rebuilt from the recorded inputs, not from the last grouping's output — reading
-        // pack quantity back off the variant would make each run depend on the answer the
-        // previous one gave.
         val commodities = recorded.map { link ->
             SellfoxCommodity(
                 commodityId = link.commodityId,
                 sku = link.sellfoxSku,
                 name = link.commodityName,
                 fullCid = link.fullCid,
+                // Only the id path is used for grouping; the display path is not recorded.
                 fullName = "",
                 declaredSpu = link.declaredSpu,
-                weightGrams = null,
+                weightGrams = link.weightGrams,
                 children = link.baseSellfoxSku
                     ?.let { base -> listOf(SellfoxChild(base, link.baseQuantity ?: 1)) }
                     .orEmpty(),
+                // A link only exists for a commodity an import saw in scope and active.
                 isActive = true,
             )
         }
 
-        val families = SpuGrouping.group(commodities) { true }
-        val outcome = grouping.regroup(families.filter { it.hasUsableCode() }.map { it.toRegrouped() })
-        counts.wrote(outcome.skusMoved + outcome.productsCreated)
+        val families = SpuGrouping.group(commodities) { true }.filter { it.hasUsableCode() }
+        val outcome = grouping.regroup(families.map { it.toRegrouped() })
 
-        return if (!outcome.changed) "${families.size} products; grouping already correct."
-        else "${families.size} products: ${outcome.productsCreated} new, " +
-            "${outcome.skusMoved} SKUs re-filed, ${outcome.emptyProductsRemoved} emptied products removed."
+        // A product holding none of the SKUs just placed is one the scope no longer
+        // covers — the import forgot its links, so nothing here filed anything under it.
+        val deactivated = grouping.deactivateProductsNotIn(families.map { it.spuCode }.toSet())
+
+        counts.wrote(outcome.productsCreated + outcome.skusCreated + outcome.skusMoved)
+
+        return buildString {
+            append("${families.size} products")
+            if (!outcome.changed && deactivated == 0) {
+                append("; grouping already correct.")
+            } else {
+                append(": ${outcome.productsCreated} new")
+                append(", ${outcome.skusCreated} SKUs added")
+                if (outcome.skusMoved > 0) append(", ${outcome.skusMoved} re-filed")
+                if (outcome.emptyProductsRemoved > 0) append(", ${outcome.emptyProductsRemoved} emptied removed")
+                if (deactivated > 0) append(", $deactivated deactivated")
+                append(".")
+            }
+        }
     }
 
     private fun SpuGrouping.Family.toRegrouped() = RegroupedFamily(
@@ -66,7 +87,14 @@ class SpuRegrouper(
                 variantValue = member.variantValue,
                 packQuantity = member.packQuantity,
                 sortOrder = index,
+                weight = member.commodity.weightGrams?.let { grams ->
+                    BigDecimal.valueOf(grams).divide(GRAMS_PER_KILO, 3, RoundingMode.HALF_UP)
+                },
             )
         },
     )
+
+    private companion object {
+        val GRAMS_PER_KILO: BigDecimal = BigDecimal(1000)
+    }
 }

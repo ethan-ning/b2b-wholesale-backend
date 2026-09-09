@@ -1,6 +1,7 @@
 package com.acme.b2b.domain.catalog
 
 import com.acme.b2b.types.VariantAxis
+import java.math.BigDecimal
 
 /**
  * Moves SKUs between products when the grouping changes.
@@ -21,6 +22,14 @@ interface ProductGroupingRepository {
      * shell that a Product could not legally be anyway, having no variants.
      */
     fun regroup(families: List<RegroupedFamily>): RegroupOutcome
+
+    /**
+     * Hides ERP-sourced products left holding no SKU the latest grouping placed.
+     *
+     * Deactivated rather than deleted: the tier pricing an admin set hangs off those
+     * rows, and a category removed by mistake would otherwise cost all of it.
+     */
+    fun deactivateProductsNotIn(spuCodes: Set<String>): Int
 }
 
 data class RegroupedFamily(
@@ -36,12 +45,16 @@ data class RegroupedSku(
     val variantValue: String?,
     val packQuantity: Int,
     val sortOrder: Int,
+    /** Kilograms. Carried because a SKU this run creates has no row to inherit from. */
+    val weight: BigDecimal?,
 )
 
 data class RegroupOutcome(
     val productsCreated: Int,
+    val skusCreated: Int,
     val skusMoved: Int,
     val emptyProductsRemoved: Int,
 ) {
-    val changed: Boolean get() = productsCreated > 0 || skusMoved > 0 || emptyProductsRemoved > 0
+    val changed: Boolean
+        get() = productsCreated > 0 || skusCreated > 0 || skusMoved > 0 || emptyProductsRemoved > 0
 }
