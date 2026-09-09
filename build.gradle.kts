@@ -1,9 +1,13 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm) apply false
-    alias(libs.plugins.kotlin.spring) apply false
-    alias(libs.plugins.kotlin.jpa) apply false
-    alias(libs.plugins.spring.boot) apply false
+    kotlin("jvm") apply false
+    kotlin("plugin.spring") apply false
+    kotlin("plugin.jpa") apply false
+    id("org.springframework.boot") apply false
 }
+
+// Versions come from gradle.properties.
+val javaVersion: String by project
+val springBootVersion: String by project
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
@@ -11,15 +15,15 @@ subprojects {
     repositories { mavenCentral() }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-        jvmToolchain(rootProject.libs.versions.java.get().toInt())
+        jvmToolchain(javaVersion.toInt())
         compilerOptions { freeCompilerArgs.add("-Xjsr305=strict") }
     }
 
     dependencies {
-        // Gradle-native dependency management: the Boot BOM is a platform, so module
-        // builds name libraries without versions and cannot drift apart.
-        "implementation"(platform(rootProject.libs.spring.boot.bom))
-        "testImplementation"(platform(rootProject.libs.spring.boot.bom))
+        // Gradle-native dependency management: the Boot BOM is applied as a platform, so
+        // module builds name libraries without versions and cannot drift apart.
+        "implementation"(platform("org.springframework.boot:spring-boot-dependencies:$springBootVersion"))
+        "testImplementation"(platform("org.springframework.boot:spring-boot-dependencies:$springBootVersion"))
         "testImplementation"(kotlin("test"))
     }
 

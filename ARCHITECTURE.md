@@ -118,41 +118,40 @@ Gradle will say so. Only a bare `java -jar` on the built artifact uses whatever
 Needs a Postgres at `DB_URL` (defaults to `jdbc:postgresql://localhost:5432/b2b`).
 Flyway owns the schema; Hibernate is set to `validate` and never alters it.
 
-Dependency versions live in `gradle/libs.versions.toml`. The Spring Boot BOM is applied
-as a Gradle platform, so no module names a version.
+Versions live in `gradle.properties`; the Spring Boot BOM is applied as a Gradle
+platform, so no module names a library version.
 
 ### Where versions live
 
-Two files, split by what the value *is*:
+Everything is in **`gradle.properties`** — project coordinates, `javaVersion`,
+`kotlinVersion`, `springBootVersion`, and how the build runs. No `build.gradle.kts`
+contains a version literal.
 
-- **`gradle.properties`** — project coordinates (`group`, `version`) and how the build
-  runs (parallel, caching, daemon JVM args). Gradle reads `group` and `version` into
-  every project, which is why they belong here rather than in `build.gradle.kts`.
-- **`gradle/libs.versions.toml`** — what the build depends on: `java`, `kotlin`,
-  `springBoot`, and every library and plugin. `java` feeds `jvmToolchain()`, so that one
-  line determines the bytecode, and no `build.gradle.kts` contains a version literal.
+Two mechanics make that work:
 
-Dependency versions are deliberately *not* in `gradle.properties`. A project property is
-overridable by `-PkotlinVersion=…`, by an `ORG_GRADLE_PROJECT_kotlinVersion` environment
-variable, and by a stale `~/.gradle/gradle.properties` — silently, with no warning. That
-is the right behaviour for build settings and the wrong behaviour for the compiler
-version. Catalog entries cannot be overridden that way, and give type-safe accessors
-(`libs.versions.kotlin`) that fail at configuration time on a typo rather than resolving
-to an empty string.
+- **Plugin versions** are resolved in `settings.gradle.kts`, inside `pluginManagement`.
+  A build script's `plugins {}` block cannot read project properties, but `by settings`
+  can, so each plugin is versioned once there and applied without a version everywhere
+  else.
+- **Library versions** mostly do not need declaring. The Spring Boot BOM is applied as a
+  Gradle platform in every module, so `spring-boot-starter-web`, `jackson-module-kotlin`,
+  `flyway-core`, `postgresql` and the rest are named without versions and stay mutually
+  consistent.
 
 Gradle's own version lives in `gradle/wrapper/gradle-wrapper.properties`, because the
-wrapper bootstraps before any build script runs. It is not mirrored in the catalog: a
-second copy would be decorative, since the wrapper is what actually runs, and a mismatch
-between them announces itself immediately.
+wrapper bootstraps before any build script runs.
 
-Two earlier drafts of this are worth not repeating:
+One consequence to know about: project properties are overridable by `-PkotlinVersion=…`,
+by an `ORG_GRADLE_PROJECT_kotlinVersion` environment variable, and by
+`~/.gradle/gradle.properties` — silently. Convenient for a one-off experiment; worth
+remembering if a build ever resolves a version nobody declared.
+
+Two earlier drafts are worth not repeating:
 
 - Pinning the daemon's JVM via `gradle-daemon-jvm.properties` and the foojay resolver.
-  The daemon's JVM does not affect the bytecode — `jvmToolchain` already guarantees that
-  — so it bought only a known JVM for the build *process*, at the cost of a plugin, a
-  file of baked download URLs, and a consistency check.
-- Mirroring the Gradle version into the catalog and adding a task to keep the two in
-  step. That guarded a duplicate that need not have existed.
+  The daemon's JVM does not affect the bytecode — `jvmToolchain` already guarantees that.
+- Mirroring the Gradle version into a second file and adding a task to keep the two in
+  step, which guarded a duplicate that need not have existed.
 
 ### Why these versions
 

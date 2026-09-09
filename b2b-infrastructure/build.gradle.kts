@@ -1,15 +1,15 @@
 plugins {
-    alias(libs.plugins.kotlin.spring)
-    alias(libs.plugins.kotlin.jpa)
+    kotlin("plugin.spring")
+    kotlin("plugin.jpa")
 }
 
 // Implements the domain's ports. This is the only module that knows JPA exists, and the
 // only place a DO type is visible.
 dependencies {
     api(project(":b2b-domain"))
-    implementation(libs.spring.boot.starter.jpa)
-    implementation(libs.kotlin.reflect)
-    runtimeOnly(libs.postgresql)
-    testImplementation(libs.spring.boot.starter.test)
-    testImplementation(libs.h2)
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+    runtimeOnly("org.postgresql:postgresql")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("com.h2database:h2")
 }
