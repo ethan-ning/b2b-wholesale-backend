@@ -102,9 +102,13 @@ Deliberate, in rough priority order:
 
 ## Running it
 
-Java 25. The build pins it via `jvmToolchain(25)`, and the foojay resolver in
+Java 21. The build pins it via `jvmToolchain(21)`, and the foojay resolver in
 `settings.gradle.kts` downloads it on a machine that does not have it — so the JDK is a
 property of the build, not of whoever is building.
+
+The toolchain governs compilation, `test` and `bootRun`, so the whole development loop
+runs on 21 regardless of the machine's default JDK. Only a bare `java -jar` on the
+built artifact uses whatever `JAVA_HOME` points at; the bytecode is Java 21 either way.
 
 ```bash
 ./gradlew build          # compiles every module, runs tests, enforces the layering
@@ -118,8 +122,25 @@ Flyway owns the schema; Hibernate is set to `validate` and never alters it.
 Dependency versions live in `gradle/libs.versions.toml`. The Spring Boot BOM is applied
 as a Gradle platform, so no module names a version.
 
-Kotlin is on 2.4.x because earlier versions cap their JVM target below 25 — 2.2 clamps to
-24 while javac targets 25, and the build fails on that mismatch rather than quietly
-producing inconsistent bytecode. Spring Boot 3.5 is not officially certified above Java 24
-but starts and runs on 25 (verified); moving to Boot 4.x is the supported path when
-convenient.
+### Why these versions
+
+**Java 21** — an LTS inside Spring Boot 3.5's certified support matrix. Boot 3.5 does run
+on 25, but 25 is outside what it is tested against, and there is nothing in this codebase
+that needs a newer JVM.
+
+**Spring Boot 3.5.0** with **Kotlin 2.2.21**. Boot's BOM pins `kotlin.version` to 1.9.25,
+but that constraint loses to the Kotlin plugin's own dependency during conflict
+resolution (`1.9.25 -> 2.2.21 (c)`), so the compiler and stdlib stay aligned and the BOM
+does not dictate the Kotlin version. The choice therefore comes down to Gradle:
+
+- 2.1.x predates official Gradle 9 support. It builds here, but "happens to work" is a
+  poor foundation.
+- **2.2.x** is the line that added Gradle 9 support, is several patch releases in, and is
+  contemporaneous with Boot 3.5 — the ecosystem around it (`jackson-module-kotlin`,
+  coroutines) was built and tested against this era.
+- 2.3.x and 2.4.x also build cleanly with no warnings. Moving up is a one-line change in
+  the version catalog; there is simply no current reason to pair a 2026 compiler with a
+  2025 framework.
+
+All four were verified to build, pass tests and emit no compatibility warnings before
+settling on 2.2.21.
