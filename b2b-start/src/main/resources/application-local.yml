@@ -9,6 +9,10 @@ spring:
     # Adds a sample catalog on top of the real migrations. Production never lists this
     # location, so the seed cannot reach it.
     locations: classpath:db/migration,classpath:db/seed
+    # The seeds sit at V900+ to stay clear of real migrations, which means every new
+    # real migration arrives "before" them and Flyway would refuse it. Allowed here
+    # only: production has no seeds, so its migrations stay strictly ordered.
+    out-of-order: true
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/b2b}
@@ -18,6 +22,20 @@ spring:
 security:
   jwt:
     secret: ${JWT_SECRET:local-development-secret-at-least-32-bytes-long}
+
+sellfox:
+  # Real credentials even locally — there is no Sellfox sandbox, and a sync tested
+  # against a stub is a sync that has not been tested. Left unset the app still starts;
+  # only a sync run fails, and it fails into the run history where you can read it.
+  client-id: ${SELLFOX_APP_ID:}
+  client-secret: ${SELLFOX_APP_SECRET:}
+  schedule:
+    # Manual triggering only. A cron firing while you are mid-debug rewrites the rows
+    # you were looking at.
+    enabled: ${SELLFOX_SCHEDULE_ENABLED:false}
+    inventory-cron: ${SELLFOX_INVENTORY_CRON:0 */15 * * * *}
+    catalog-cron: ${SELLFOX_CATALOG_CRON:0 15 2 * * *}
+    zone: ${SELLFOX_SCHEDULE_ZONE:America/Chicago}
 
 logging:
   level:

@@ -15,6 +15,7 @@ value class SpuCode(val value: String) {
     override fun toString() = value
 
     companion object {
-        private val PATTERN = Regex("^[A-Z0-9]+(-[A-Z0-9]+)*$")
+        /** Same shape as a SKU code — an SPU is derived from the SKUs beneath it. */
+        private val PATTERN = Regex("^[A-Z0-9]+([A-Z0-9 -]*[A-Z0-9])?$")
     }
 }

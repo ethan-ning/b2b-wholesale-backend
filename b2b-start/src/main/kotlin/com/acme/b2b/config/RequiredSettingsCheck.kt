@@ -50,6 +50,8 @@ class RequiredSettingsCheck : EnvironmentPostProcessor {
             "spring.datasource.username" to "DB_USER",
             "spring.datasource.password" to "DB_PASSWORD",
             "security.jwt.secret" to "JWT_SECRET",
+            "sellfox.client-id" to "SELLFOX_APP_ID",
+            "sellfox.client-secret" to "SELLFOX_APP_SECRET",
         )
     }
 }

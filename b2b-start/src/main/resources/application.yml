@@ -39,6 +39,22 @@ security:
     secret: ${JWT_SECRET}
     ttl-minutes: ${JWT_TTL_MINUTES:480}
 
+# Sellfox ERP. Credentials have no fallback for the same reason the database has none.
+sellfox:
+  base-url: ${SELLFOX_BASE_URL:https://openapi.sellfox.com}
+  client-id: ${SELLFOX_APP_ID}
+  client-secret: ${SELLFOX_APP_SECRET}
+  request-timeout-seconds: ${SELLFOX_TIMEOUT_SECONDS:60}
+  schedule:
+    # Off unless asked for. A second instance running the same cron would double every
+    # sync, so enabling it is a deployment decision rather than a default.
+    enabled: ${SELLFOX_SCHEDULE_ENABLED:false}
+    # Stock, every 15 minutes. Reads only the selected warehouses.
+    inventory-cron: ${SELLFOX_INVENTORY_CRON:0 */15 * * * *}
+    # Catalog, nightly at 02:15. Pages every commodity Sellfox holds, so not more often.
+    catalog-cron: ${SELLFOX_CATALOG_CRON:0 15 2 * * *}
+    zone: ${SELLFOX_SCHEDULE_ZONE:America/Chicago}
+
 server:
   port: ${SERVER_PORT:8080}
 

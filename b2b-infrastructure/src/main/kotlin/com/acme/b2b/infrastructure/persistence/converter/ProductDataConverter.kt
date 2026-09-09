@@ -76,6 +76,53 @@ class ProductDataConverter {
         return row
     }
 
+    /**
+     * The fields Sellfox owns. Separate from [applyTo] because that method is what portal
+     * edits go through, and it must not be able to overwrite a synced name — the two
+     * write-paths having different reach is the whole point of the ownership split.
+     */
+    fun applySyncedIdentity(row: ProductDO, product: Product) {
+        row.spuCode = product.spuCode.value
+        row.name = product.name
+        row.description = product.description
+        row.variantAxis = product.variantAxis?.label
+        row.updatedAt = Instant.now()
+    }
+
+    /**
+     * Brings the SKU set in line with what Sellfox reports, keeping the portal-owned
+     * columns on rows that survive. A SKU that has gone is marked DISCONTINUED rather
+     * than deleted: its tier prices hang off it, and a supplier dropping a pack size for
+     * a month should not cost the pricing that was set for it.
+     */
+    fun replaceVariants(row: ProductDO, product: Product) {
+        product.variants.forEach { variant ->
+            val existing = row.variants.firstOrNull { it.sku == variant.sku.value }
+            if (existing == null) {
+                row.variants.add(
+                    ProductVariantDO(
+                        product = row,
+                        sku = variant.sku.value,
+                        variantValue = variant.variantValue,
+                        sortOrder = variant.sortOrder,
+                        packQuantity = variant.packQuantity.value,
+                        weight = variant.weight,
+                        status = "ACTIVE",
+                    )
+                )
+            } else {
+                existing.variantValue = variant.variantValue
+                existing.sortOrder = variant.sortOrder
+                existing.packQuantity = variant.packQuantity.value
+                existing.weight = variant.weight
+                existing.status = "ACTIVE"
+            }
+        }
+
+        val current = product.variants.map { it.sku.value }.toSet()
+        row.variants.filterNot { it.sku in current }.forEach { it.status = "DISCONTINUED" }
+    }
+
     fun toDomain(row: CategoryDO, children: List<Category>): Category = Category(
         id = row.id,
         name = row.name,

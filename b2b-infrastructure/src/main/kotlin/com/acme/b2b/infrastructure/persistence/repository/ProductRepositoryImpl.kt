@@ -7,10 +7,12 @@ import com.acme.b2b.domain.pricing.PricingPolicy
 import com.acme.b2b.domain.pricing.TierPriceRepository
 import com.acme.b2b.infrastructure.persistence.converter.ProductDataConverter
 import com.acme.b2b.infrastructure.persistence.entity.ProductCategoryDO
+import com.acme.b2b.infrastructure.persistence.entity.ProductDO
 import com.acme.b2b.infrastructure.persistence.jpa.ProductJpaRepository
 import com.acme.b2b.types.Money
 import com.acme.b2b.types.SpuCode
 import com.acme.b2b.types.TierId
+import java.time.Instant
 import org.springframework.stereotype.Repository
 
 /**
@@ -63,6 +65,34 @@ class ProductRepositoryImpl(
 
         val window = found.drop(page.offset).take(page.size)
         return PageOf(window, found.size.toLong(), page)
+    }
+
+    /**
+     * Inserts a product and its SKUs. Only the Sellfox import reaches here — [save] is
+     * what portal edits go through, and it refuses to create.
+     */
+    override fun create(product: Product): Product {
+        val row = ProductDO()
+        converter.applyTo(row, product)
+        converter.applySyncedIdentity(row, product)
+        converter.replaceVariants(row, product)
+        row.source = "SELLFOX"
+        row.createdAt = Instant.now()
+        return converter.toDomain(jpa.save(row))
+    }
+
+    /**
+     * Writes back only what Sellfox owns. The portal-owned columns on the row are never
+     * touched, so a nightly sync cannot undo a price an admin set this afternoon.
+     */
+    override fun saveSynced(incoming: Product, existing: Product): Product {
+        val row = jpa.findById(requireNotNull(existing.id)).orElseThrow {
+            IllegalStateException("Product ${existing.spuCode} vanished mid-sync")
+        }
+        converter.applySyncedIdentity(row, incoming)
+        converter.replaceVariants(row, incoming)
+        row.source = "SELLFOX"
+        return converter.toDomain(jpa.save(row))
     }
 
     override fun save(product: Product): Product {

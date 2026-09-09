@@ -65,6 +65,7 @@ interface ProductVariantJpaRepository : JpaRepository<ProductVariantDO, Long> {
 
     fun countByAvailableStockGreaterThanAndAvailableStockLessThan(floor: Int, ceiling: Int): Long
     fun countByAvailableStock(availableStock: Int): Long
+    fun findBySkuIn(skus: Collection<String>): List<ProductVariantDO>
 }
 
 interface TierPriceJpaRepository : JpaRepository<TierPriceDO, Long> {
@@ -114,4 +115,25 @@ interface CustomerJpaRepository : JpaRepository<CustomerDO, Long> {
         @Param("status") status: String?,
         pageable: Pageable,
     ): org.springframework.data.domain.Page<CustomerDO>
+}
+
+// ─── Sellfox ─────────────────────────────────────────────────────────────
+
+interface SellfoxCategoryJpaRepository : JpaRepository<SellfoxCategoryDO, String> {
+    fun findBySelectedTrue(): List<SellfoxCategoryDO>
+}
+
+interface SellfoxWarehouseJpaRepository : JpaRepository<SellfoxWarehouseDO, Long> {
+    fun findBySelectedTrue(): List<SellfoxWarehouseDO>
+}
+
+interface SellfoxSkuLinkJpaRepository : JpaRepository<SellfoxSkuLinkDO, String> {
+    fun findByFullCidIn(fullCids: Collection<String>): List<SellfoxSkuLinkDO>
+}
+
+interface SellfoxSyncRunJpaRepository : JpaRepository<SellfoxSyncRunDO, Long> {
+    fun findAllByOrderByStartedAtDesc(pageable: Pageable): List<SellfoxSyncRunDO>
+    fun findByJobOrderByStartedAtDesc(job: String, pageable: Pageable): List<SellfoxSyncRunDO>
+    fun existsByJobAndStatus(job: String, status: String): Boolean
+    fun findByStatus(status: String): List<SellfoxSyncRunDO>
 }

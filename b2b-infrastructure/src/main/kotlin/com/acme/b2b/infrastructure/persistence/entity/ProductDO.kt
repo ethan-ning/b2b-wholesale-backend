@@ -44,6 +44,10 @@ class ProductDO(
     @Column(nullable = false)
     var status: String = "ACTIVE",
 
+    /** PORTAL or SELLFOX — where this row's identity comes from. */
+    @Column(nullable = false)
+    var source: String = "PORTAL",
+
     @Column(name = "created_at")
     var createdAt: Instant? = null,
 

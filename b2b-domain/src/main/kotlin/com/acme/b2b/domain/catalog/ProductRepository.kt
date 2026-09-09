@@ -20,6 +20,24 @@ interface ProductRepository {
     fun findByCategoryId(categoryId: Long): List<Product>
     fun save(product: Product): Product
 
+    /**
+     * Creates a product that does not exist yet. Separate from [save] because the portal
+     * must not create products — they come from the ERP — and only the Sellfox import
+     * legitimately calls this. Two methods say that; one method with a flag does not.
+     */
+    fun create(product: Product): Product
+
+    /**
+     * Updates only what Sellfox owns — name, description, axis, and the SKU set — leaving
+     * pricing, MAP, categories, images and attributes as the portal set them. [incoming]
+     * carries the synced fields, [existing] is the row they land on.
+     *
+     * The split is the field-ownership rule made structural: [save] cannot write a synced
+     * field and this cannot write a portal one, so neither path can overwrite the other's
+     * work by accident.
+     */
+    fun saveSynced(incoming: Product, existing: Product): Product
+
     fun countAll(): Long
     fun countByStatus(status: ProductStatus): Long
 }

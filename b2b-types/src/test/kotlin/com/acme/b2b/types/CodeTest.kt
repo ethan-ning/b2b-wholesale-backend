@@ -12,8 +12,17 @@ class CodeTest {
     @Test
     fun `rejects malformed codes at construction`() {
         assertFailsWith<IllegalArgumentException> { SpuCode("") }
-        assertFailsWith<IllegalArgumentException> { SpuCode("pl001-blk") }   // lower case
-        assertFailsWith<IllegalArgumentException> { SkuCode("GL100 BLK M") } // space
+        assertFailsWith<IllegalArgumentException> { SpuCode("pl001-blk") }    // lower case
+        assertFailsWith<IllegalArgumentException> { SkuCode(" GL100-BLK") }   // leading space
+        assertFailsWith<IllegalArgumentException> { SkuCode("GL100-BLK ") }   // trailing space
+    }
+
+    @Test
+    fun `accepts the spaces real supplier codes carry`() {
+        // "AX-K210-ZN-4" and "AX-K210-ZN-4 S" are different products at the supplier.
+        // Rejecting the spaced form pushes callers into normalising it, which merges them.
+        assertEquals("AX-K210-ZN-4 S", SkuCode("AX-K210-ZN-4 S").value)
+        assertEquals("WM7C310J255-QT4 BK", SpuCode("WM7C310J255-QT4 BK").value)
     }
 
     @Test
@@ -21,6 +30,15 @@ class CodeTest {
         val spu = SpuCode("GL100-BLK")
         assertTrue(SkuCode("GL100-BLK-M").belongsTo(spu))
         assertFalse(SkuCode("GL100-BRN-M").belongsTo(spu))
+    }
+
+    @Test
+    fun `a product's only SKU may be the SPU code itself`() {
+        val spu = SpuCode("RB-QF01-S")
+        assertTrue(SkuCode("RB-QF01-S").belongsTo(spu))
+        assertNull(SkuCode("RB-QF01-S").variantSuffix(spu))   // nothing to vary on
+        assertTrue(SkuCode("RB-QF01-S-2P").belongsTo(spu))
+        assertEquals("2P", SkuCode("RB-QF01-S-2P").variantSuffix(spu))
     }
 
     @Test

@@ -79,6 +79,9 @@ class AdminApiSecurityTest {
     @MockitoBean private lateinit var inventoryQuery: InventoryQueryService
     @MockitoBean private lateinit var dashboard: DashboardService
     @MockitoBean private lateinit var dealerAuth: DealerAuthService
+    @MockitoBean private lateinit var sellfoxAdmin: com.acme.b2b.application.sellfox.SellfoxAdminService
+    @MockitoBean private lateinit var sellfoxCatalog: com.acme.b2b.application.sellfox.SellfoxCatalogSyncService
+    @MockitoBean private lateinit var sellfoxInventory: com.acme.b2b.application.sellfox.SellfoxInventorySyncService
 
     private val adminToken = token(scope = "ADMIN", secret = SECRET)
     private val dealerToken = token(scope = "DEALER", secret = SECRET)
