@@ -1,6 +1,14 @@
 # Single source of truth for versions. Modules reference aliases only — no version
 # literals in any build.gradle.kts.
 [versions]
+# The toolchain every module compiles, tests and runs against. Also the version the
+# Gradle daemon itself runs on — see gradle/gradle-daemon-jvm.properties, which is kept
+# in step by the `checkVersionConsistency` task in the root build.
+java = "21"
+# Must match gradle/wrapper/gradle-wrapper.properties. The wrapper cannot read this file
+# (it bootstraps before any build script), so the two are cross-checked instead.
+gradle = "9.7.1"
+
 kotlin = "2.2.21"
 springBoot = "3.5.0"
 

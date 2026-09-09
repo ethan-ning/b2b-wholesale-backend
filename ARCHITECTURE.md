@@ -122,6 +122,31 @@ Flyway owns the schema; Hibernate is set to `validate` and never alters it.
 Dependency versions live in `gradle/libs.versions.toml`. The Spring Boot BOM is applied
 as a Gradle platform, so no module names a version.
 
+### Where versions live
+
+Three files, because Gradle insists on a specific home for two of them — the wrapper
+bootstraps before any build script runs, and the daemon's JVM is chosen before that, so
+neither can read the version catalog.
+
+| File | Holds | Regenerate with |
+|---|---|---|
+| `gradle/libs.versions.toml` | Declared `java`, `gradle`, `kotlin`, `springBoot`, and every library and plugin | edit directly |
+| `gradle/gradle-daemon-jvm.properties` | The JVM the Gradle daemon runs on | `./gradlew updateDaemonJvm --jvm-version=21` |
+| `gradle/wrapper/gradle-wrapper.properties` | Gradle itself | `./gradlew wrapper --gradle-version 9.7.1` |
+
+The catalog is the **declared** source of truth; the other two are generated artifacts of
+it. `checkVersionConsistency` — wired into `check`, so `./gradlew build` runs it — fails
+if either drifts, naming the command that fixes it:
+
+```
+Version drift:
+  - daemon JVM is 21 but libs.versions.toml declares java = "22"; run: ./gradlew updateDaemonJvm --jvm-version=22
+```
+
+Because the daemon JVM is pinned by criteria rather than by `JAVA_HOME`, the build runs on
+Java 21 whatever the machine's default JDK is, and the foojay resolver downloads it if the
+machine has none.
+
 ### Why these versions
 
 **Java 21** — an LTS inside Spring Boot 3.5's certified support matrix. Boot 3.5 does run

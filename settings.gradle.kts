@@ -1,7 +1,7 @@
 // Lets Gradle download the Java 25 toolchain on a machine that does not have it, so the
 // project's JDK is a property of the build rather than of whoever is building it.
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 rootProject.name = "b2b-wholesale"
