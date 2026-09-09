@@ -11,6 +11,12 @@ import org.springframework.stereotype.Component
 /**
  * The cron side of the Sellfox sync: two cadences over the one scope.
  *
+ * Regrouping is not among them. Its inputs only change when a full run brings in new
+ * SKUs, and that run regroups within itself — so a separate schedule would spend its
+ * wake-ups confirming an answer nothing had disturbed. It is worth running when the
+ * grouping rules change, which is a deploy, not an hour of the day, so it is triggered
+ * by hand.
+ *
  * Lives in the start module rather than infrastructure because it drives the application
  * layer, and the dependency rule (enforced by `checkLayering`) forbids an adapter module
  * from depending on it. A scheduler is a trigger, exactly like a controller — the
@@ -40,17 +46,6 @@ class SellfoxSyncScheduler(private val sync: SellfoxSyncService) {
      */
     @Scheduled(cron = "\${sellfox.schedule.full-cron}", zone = "\${sellfox.schedule.zone}")
     fun fullSync() = guard("full") { sync.syncFull(TriggerSource.SCHEDULED) }
-
-    /**
-     * Regrouping on its own, between full runs.
-     *
-     * Cheap — it reads no Sellfox endpoint — but also usually a no-op: the inputs only
-     * change when a full run brings in new SKUs, and that run regroups already. It earns
-     * its place when the grouping rules themselves change, where it fixes the catalog in
-     * seconds instead of a two-minute re-page of a catalog that has not moved.
-     */
-    @Scheduled(cron = "\${sellfox.schedule.regroup-cron}", zone = "\${sellfox.schedule.zone}")
-    fun regroup() = guard("regroup") { sync.regroup(TriggerSource.SCHEDULED) }
 
     /**
      * A scheduled method that throws is logged by Spring and then simply not retried, and

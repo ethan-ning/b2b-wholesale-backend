@@ -78,8 +78,12 @@ class SellfoxSyncService(
      * spend two minutes re-paging a catalog that has not changed to arrive at the same
      * inputs.
      *
-     * Run after every full sync for the same reason: the import files each family as it
-     * is built, and this is what reconciles the whole set afterwards.
+     * Run at the end of every full sync for the same reason: the import files each
+     * family as it is built and cannot move a SKU another product still owns.
+     *
+     * Not scheduled on its own. Between full runs its inputs do not change, so a cron
+     * would only ever confirm the previous answer; what makes it worth running is a
+     * change to the grouping rules, which is a deploy rather than an hour of the day.
      */
     fun regroup(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun =
         runner.run(SyncMode.REGROUP, trigger, triggeredBy) { counts -> regroupFromLinks(counts) }

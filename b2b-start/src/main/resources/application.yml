@@ -54,9 +54,6 @@ sellfox:
     # Everything, nightly at 02:15. Pages the whole catalog and deactivates what has left
     # the scope — a couple of minutes of paced calls, so not more often than daily.
     full-cron: ${SELLFOX_FULL_CRON:0 15 2 * * *}
-    # Regrouping, every four hours. Calls no Sellfox endpoint, and a full run already
-    # regroups — so between full runs this is a no-op unless the grouping rules changed.
-    regroup-cron: ${SELLFOX_REGROUP_CRON:0 45 */4 * * *}
     zone: ${SELLFOX_SCHEDULE_ZONE:America/Chicago}
 
 server:
