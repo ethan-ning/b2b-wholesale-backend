@@ -1,0 +1,64 @@
+package com.acme.b2b.domain.catalog
+
+import com.acme.b2b.types.Money
+import com.acme.b2b.types.SkuCode
+import com.acme.b2b.types.SpuCode
+import com.acme.b2b.types.VariantAxis
+
+/**
+ * Aggregate root for the catalog. A Product is a style/colour; its SKUs vary along a
+ * single [variantAxis] — size for apparel, pack quantity for parts.
+ *
+ * Invariants enforced here, so no caller can assemble a nonsensical product:
+ *  - every SKU code sits beneath this SPU code
+ *  - a multi-SKU product declares an axis
+ *  - SKU codes are unique within the product
+ */
+class Product(
+    val id: Long?,
+    val spuCode: SpuCode,
+    val name: String,
+    val brand: String?,
+    val description: String?,
+    /** List price. Only reached when a SKU has no tier price at all — see PricingPolicy. */
+    val baseWholesalePrice: Money,
+    val locationCode: String?,
+    val variantAxis: VariantAxis?,
+    val attributes: Map<String, String>,
+    val status: ProductStatus,
+    val categoryIds: List<Long>,
+    val primaryCategoryId: Long?,
+    val imageUrls: List<String>,
+    variants: List<ProductVariant>,
+) {
+    val variants: List<ProductVariant> = variants.sortedBy { it.sortOrder }
+
+    init {
+        require(name.isNotBlank()) { "Product name must not be blank" }
+        require(variants.isNotEmpty()) { "Product $spuCode has no SKUs" }
+
+        val offenders = variants.filterNot { it.sku.belongsTo(spuCode) }
+        require(offenders.isEmpty()) {
+            "SKUs must sit beneath $spuCode: ${offenders.joinToString { it.sku.value }}"
+        }
+
+        val duplicates = variants.groupBy { it.sku }.filterValues { it.size > 1 }.keys
+        require(duplicates.isEmpty()) { "Duplicate SKUs in $spuCode: $duplicates" }
+
+        require(variants.size == 1 || variantAxis != null) {
+            "Product $spuCode has ${variants.size} SKUs and must declare a variant axis"
+        }
+    }
+
+    val isPublished: Boolean get() = status == ProductStatus.ACTIVE
+
+    fun variant(sku: SkuCode): ProductVariant? = variants.firstOrNull { it.sku == sku }
+
+    fun requireVariant(sku: SkuCode): ProductVariant =
+        variant(sku) ?: throw NoSuchElementException("$sku is not a SKU of $spuCode")
+
+    val totalAvailableStock: Int get() = variants.sumOf { it.stock.available }
+    val hasStock: Boolean get() = totalAvailableStock > 0
+
+    override fun toString() = "Product($spuCode)"
+}
