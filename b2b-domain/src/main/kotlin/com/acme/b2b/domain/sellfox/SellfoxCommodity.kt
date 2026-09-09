@@ -28,15 +28,9 @@ data class SellfoxCommodity(
      * a pack from a kit, and the child list does.
      */
     val children: List<SellfoxChild>,
-    /** Sellfox lifecycle state; 1 is active. */
-    val state: String,
-) {
-    val isActive: Boolean get() = state == ACTIVE_STATE
-
-    private companion object {
-        const val ACTIVE_STATE = "1"
-    }
-}
+    /** False for a commodity Sellfox has retired. Their lifecycle codes stop at the adapter. */
+    val isActive: Boolean,
+)
 
 data class SellfoxChild(val sku: String, val quantity: Int)
 

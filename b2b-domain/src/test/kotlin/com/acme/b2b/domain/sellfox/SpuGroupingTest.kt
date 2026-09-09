@@ -17,7 +17,7 @@ class SpuGroupingTest {
         name: String = "Part",
         cid: String = "100010-100020-100030-",
         children: List<SellfoxChild> = emptyList(),
-        state: String = "1",
+        active: Boolean = true,
         declaredSpu: String? = null,
     ) = SellfoxCommodity(
         commodityId = sku.hashCode().toString(),
@@ -28,7 +28,7 @@ class SpuGroupingTest {
         declaredSpu = declaredSpu,
         weightGrams = null,
         children = children,
-        state = state,
+        isActive = active,
     )
 
     private fun group(vararg commodities: SellfoxCommodity) =
@@ -310,8 +310,8 @@ class SpuGroupingTest {
     @Test
     fun `discontinued commodities are left out`() {
         val families = group(
-            commodity("RB-JBX7-4", state = "4"),
-            commodity("RB-HV08-4", state = "1"),
+            commodity("RB-JBX7-4", active = false),
+            commodity("RB-HV08-4"),
         )
 
         assertEquals(listOf("RB-HV08"), families.map { it.spuCode })

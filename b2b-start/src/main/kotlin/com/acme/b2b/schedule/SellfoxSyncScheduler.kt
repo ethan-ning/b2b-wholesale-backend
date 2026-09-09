@@ -9,21 +9,12 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
 /**
- * The cron side of the Sellfox sync: two cadences over the one scope.
+ * The cron side of the Sellfox sync: two cadences over the one scope, hourly stock and a
+ * nightly full run. Regrouping is deliberately not scheduled — see [SellfoxSyncService].
  *
- * Regrouping is not among them. Its inputs only change when a full run brings in new
- * SKUs, and that run regroups within itself — so a separate schedule would spend its
- * wake-ups confirming an answer nothing had disturbed. It is worth running when the
- * grouping rules change, which is a deploy, not an hour of the day, so it is triggered
- * by hand.
- *
- * Lives in the start module rather than infrastructure because it drives the application
- * layer, and the dependency rule (enforced by `checkLayering`) forbids an adapter module
- * from depending on it. A scheduler is a trigger, exactly like a controller — the
- * composition root is where triggers that are not HTTP belong.
- *
- * Both schedules are properties: how fresh stock needs to be is an operational decision
- * that should not need a deploy.
+ * Lives in the start module because it drives the application layer, and `checkLayering`
+ * forbids an adapter module from depending on that. A scheduler is a trigger like a
+ * controller; the composition root is where non-HTTP triggers belong.
  */
 @Component
 @EnableScheduling
@@ -32,28 +23,17 @@ class SellfoxSyncScheduler(private val sync: SellfoxSyncService) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /**
-     * Stock, hourly. Reads only the selected warehouses, so it costs a handful of pages —
-     * and stock is the part that actually moves between catalog changes.
-     */
     @Scheduled(cron = "\${sellfox.schedule.inventory-cron}", zone = "\${sellfox.schedule.zone}")
     fun refreshStock() = guard("inventory") { sync.syncInventory(TriggerSource.SCHEDULED) }
 
-    /**
-     * The whole catalog, daily. Pages every commodity Sellfox holds — the endpoint takes
-     * no category filter — and deactivates anything that has left the scope. Too
-     * expensive to run hourly, which is exactly why the stock pass exists.
-     */
     @Scheduled(cron = "\${sellfox.schedule.full-cron}", zone = "\${sellfox.schedule.zone}")
     fun fullSync() = guard("full") { sync.syncFull(TriggerSource.SCHEDULED) }
 
     /**
-     * A scheduled method that throws is logged by Spring and then simply not retried, and
-     * an unhandled error can silence the schedule entirely. The run record already holds
-     * the failure in a form an admin can read, so this only has to stop it escaping.
-     *
-     * That includes the refusal when no scope is set: on a fresh install the hourly job
-     * has nothing to do, and should say so quietly rather than raise an alarm every hour.
+     * An unhandled error in a scheduled method can silence the schedule entirely, and the
+     * run record already holds the failure in a form an admin can read. Logged at warn
+     * rather than error because the commonest case is a fresh install with no scope set,
+     * where the hourly job has nothing to do and should say so quietly.
      */
     private fun guard(label: String, work: () -> Unit) {
         try {

@@ -9,6 +9,7 @@ import com.acme.b2b.infrastructure.persistence.converter.ProductDataConverter
 import com.acme.b2b.infrastructure.persistence.entity.ProductCategoryDO
 import com.acme.b2b.infrastructure.persistence.entity.ProductDO
 import com.acme.b2b.infrastructure.persistence.jpa.ProductJpaRepository
+import com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository
 import com.acme.b2b.types.Money
 import com.acme.b2b.types.SpuCode
 import com.acme.b2b.types.TierId
@@ -27,7 +28,7 @@ import org.springframework.stereotype.Repository
 @Repository
 class ProductRepositoryImpl(
     private val jpa: ProductJpaRepository,
-    private val variants: com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository,
+    private val variants: ProductVariantJpaRepository,
     private val converter: ProductDataConverter,
     private val tierPrices: TierPriceRepository,
     private val categories: CategoryRepository,

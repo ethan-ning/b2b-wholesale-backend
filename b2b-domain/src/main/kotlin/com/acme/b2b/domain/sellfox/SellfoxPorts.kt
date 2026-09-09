@@ -8,10 +8,12 @@ import java.time.Instant
  */
 interface SellfoxCatalogPort {
     /**
-     * Every commodity Sellfox holds. Deliberately not filtered server-side: the endpoint
-     * ignores every category parameter it was offered, so scoping happens here after the
-     * scan. At ~6,400 rows in 100-row pages that is a minute of paging, which is fine for
-     * a job that runs nightly and is the reason it does not run more often.
+     * Every commodity Sellfox holds — the whole catalog, every time.
+     *
+     * Not filtered server-side because it cannot be: cid, categoryId, fullCid and cids
+     * were each tried against the live endpoint and each returned all ~6,400 rows. So
+     * scoping happens after the scan, and the couple of minutes that costs is what sets
+     * the floor on how often a full run can go.
      */
     fun listCommodities(): List<SellfoxCommodity>
 }

@@ -1,8 +1,10 @@
 package com.acme.b2b.application.sellfox
 
+import com.acme.b2b.application.sellfox.dto.SellfoxScopeDTO
+import com.acme.b2b.application.sellfox.dto.SyncRunDTO
+import com.acme.b2b.application.sellfox.dto.toDto
 import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.sellfox.SellfoxScopeRepository
-import com.acme.b2b.domain.sellfox.SellfoxSyncRun
 import com.acme.b2b.domain.sellfox.SellfoxSyncRunRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -18,12 +20,13 @@ class SellfoxAdminService(
     private val runs: SellfoxSyncRunRepository,
 ) {
 
-    fun scope(): SellfoxScopeView = SellfoxScopeView(
+    fun scope() = SellfoxScopeDTO(
         categories = scope.categories(),
         warehouses = scope.warehouses(),
     )
 
-    fun history(limit: Int): List<SellfoxSyncRun> = runs.recent(limit.coerceIn(1, MAX_HISTORY))
+    fun history(limit: Int): List<SyncRunDTO> =
+        runs.recent(limit.coerceIn(1, MAX_HISTORY)).map { it.toDto() }
 
     /** True while a run is in flight, so the trigger button can say so before it 409s. */
     fun running(): Boolean = runs.isRunning()
@@ -50,7 +53,3 @@ class SellfoxAdminService(
     }
 }
 
-data class SellfoxScopeView(
-    val categories: List<com.acme.b2b.domain.sellfox.SellfoxCategoryScope>,
-    val warehouses: List<com.acme.b2b.domain.sellfox.SellfoxWarehouseScope>,
-)

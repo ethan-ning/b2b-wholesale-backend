@@ -20,42 +20,31 @@ interface ProductRepository {
     fun findByCategoryId(categoryId: Long): List<Product>
     fun save(product: Product): Product
 
-    /**
-     * Creates a product that does not exist yet. Separate from [save] because the portal
-     * must not create products — they come from the ERP — and only the Sellfox import
-     * legitimately calls this. Two methods say that; one method with a flag does not.
-     */
+    /** Creates a product that does not exist yet. Only the ERP import may call this. */
     fun create(product: Product): Product
 
     /**
-     * Updates only what Sellfox owns — name, description, axis, and the SKU set — leaving
-     * pricing, MAP, categories, images and attributes as the portal set them. [incoming]
-     * carries the synced fields, [existing] is the row they land on.
+     * Updates only what the ERP owns — name, description, axis, the SKU set — leaving
+     * pricing, MAP, categories, images and attributes as the portal set them.
      *
-     * The split is the field-ownership rule made structural: [save] cannot write a synced
-     * field and this cannot write a portal one, so neither path can overwrite the other's
-     * work by accident.
+     * The field-ownership rule made structural: [save] cannot write a synced field and
+     * this cannot write a portal one, so neither path overwrites the other by accident.
      */
     fun saveSynced(incoming: Product, existing: Product): Product
 
     /**
-     * Hides ERP-sourced products a full sync did not see — their category left the import
-     * scope, or the supplier dropped them. Returns how many changed.
+     * Hides ERP-sourced products a full sync did not see — their category left the scope,
+     * or the supplier dropped them. Returns how many changed.
      *
-     * Deactivated, never deleted: the pricing an admin set hangs off these rows, and a
-     * category removed by mistake would otherwise cost all of it. Only Sellfox-sourced
-     * rows are touched, so a product keyed in by hand is not swept up by a sync it was
-     * never part of.
+     * Only ERP-sourced rows are touched, so a product keyed in by hand is never swept up
+     * by a sync it was not part of.
      */
     fun deactivateSyncedProductsNotIn(spuCodes: Set<SpuCode>): Int
 
     /**
-     * Which of [skus] currently sit under a product other than [spuCode].
-     *
-     * A SKU belongs to exactly one product, so when the grouping changes it has to be
-     * *moved*, not inserted — an import that tries to add it to its new product hits the
-     * unique key and abandons the run. The import asks first and leaves those families to
-     * the regroup step, which is the only path that can re-file a SKU.
+     * Which of [skus] currently sit under a product other than [spuCode]. A SKU belongs to
+     * exactly one product, so a regrouped SKU has to be moved rather than inserted; the
+     * import asks first and leaves those to [ProductGroupingRepository].
      */
     fun skusFiledElsewhere(spuCode: SpuCode, skus: Set<String>): Set<String>
 

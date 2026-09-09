@@ -2,8 +2,11 @@ package com.acme.b2b.web.admin
 
 import com.acme.b2b.application.sellfox.SellfoxAdminService
 import com.acme.b2b.application.support.UseCaseViolation
-import com.acme.b2b.application.sellfox.SellfoxScopeView
 import com.acme.b2b.application.sellfox.SellfoxSyncService
+import com.acme.b2b.application.sellfox.dto.SellfoxScopeDTO
+import com.acme.b2b.application.sellfox.dto.SyncHistoryDTO
+import com.acme.b2b.application.sellfox.dto.SyncRunDTO
+import com.acme.b2b.application.sellfox.dto.toDto
 import com.acme.b2b.domain.sellfox.SellfoxSyncRun
 import com.acme.b2b.domain.sellfox.TriggerSource
 import org.springframework.security.core.context.SecurityContextHolder
@@ -28,7 +31,7 @@ class AdminSellfoxController(
 ) {
 
     @GetMapping("/scope")
-    fun scope(): SellfoxScopeView = admin.scope()
+    fun scope(): SellfoxScopeDTO = admin.scope()
 
     /**
      * Replaces the whole scope and immediately starts a full sync.
@@ -38,7 +41,7 @@ class AdminSellfoxController(
      * without it would leave the site selling something the admin had just removed.
      */
     @PutMapping("/scope")
-    fun setScope(@RequestBody body: ScopeRequest): SellfoxSyncRun {
+    fun setScope(@RequestBody body: ScopeRequest): SyncRunDTO {
         if (admin.running()) throw UseCaseViolation("A sync is already running")
         // Read here, not inside the lambda: the security context is a thread-local, and
         // the run executes on a pool thread that has none. Read there it comes back null,
@@ -49,8 +52,8 @@ class AdminSellfoxController(
     }
 
     @GetMapping("/runs")
-    fun runs(@RequestParam(defaultValue = "25") limit: Int): SyncHistoryResponse =
-        SyncHistoryResponse(runs = admin.history(limit), running = admin.running())
+    fun runs(@RequestParam(defaultValue = "25") limit: Int): SyncHistoryDTO =
+        SyncHistoryDTO(runs = admin.history(limit), running = admin.running())
 
     /**
      * Starts a run and returns its record in RUNNING. The client polls `/runs` for the
@@ -62,7 +65,7 @@ class AdminSellfoxController(
      * without calling Sellfox. The default is a full run.
      */
     @PostMapping("/runs")
-    fun trigger(@RequestParam(required = false) mode: String?): SellfoxSyncRun {
+    fun trigger(@RequestParam(required = false) mode: String?): SyncRunDTO {
         val by = currentAdminEmail()
 
         // Both checked here, on the request thread. The sync checks again on its own
@@ -91,8 +94,8 @@ class AdminSellfoxController(
     private fun start(
         trigger: TriggerSource,
         run: (TriggerSource) -> SellfoxSyncRun,
-    ): SellfoxSyncRun =
-        CompletableFuture.supplyAsync { run(trigger) }
+    ): SyncRunDTO =
+        CompletableFuture.supplyAsync { run(trigger).toDto() }
             .completeOnTimeout(null, HANDOFF_MILLIS, TimeUnit.MILLISECONDS)
             .exceptionally { null }
             .join()
@@ -113,8 +116,3 @@ data class ScopeRequest(
     val warehouseIds: Set<Long> = emptySet(),
 )
 
-data class SyncHistoryResponse(
-    val runs: List<SellfoxSyncRun>,
-    /** Whether a run is in flight, so the trigger button can disable itself. */
-    val running: Boolean,
-)

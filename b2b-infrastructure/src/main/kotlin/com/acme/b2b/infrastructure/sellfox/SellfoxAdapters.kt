@@ -37,11 +37,14 @@ class SellfoxCatalogAdapter(private val client: SellfoxApiClient) : SellfoxCatal
             val quantity = child.path("num").asText("").toIntOrNull() ?: 0
             if (sku.isBlank()) null else SellfoxChild(sku, quantity)
         },
-        state = path("state").asText(""),
+        isActive = path("state").asText("") == ACTIVE_STATE,
     )
 
     private companion object {
         const val COMMODITY_PATH = "/api/commodity/pageList.json"
+
+        /** Sellfox's lifecycle codes; everything else is retired or draft. */
+        const val ACTIVE_STATE = "1"
     }
 }
 
