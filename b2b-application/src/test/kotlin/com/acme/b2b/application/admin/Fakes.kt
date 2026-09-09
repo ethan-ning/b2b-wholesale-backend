@@ -169,6 +169,7 @@ class InMemoryProductRepository(seed: List<Product> = emptyList()) : ProductRepo
     override fun create(product: Product) = throw NotImplementedError()
     override fun saveSynced(incoming: Product, existing: Product) = throw NotImplementedError()
     override fun deactivateSyncedProductsNotIn(spuCodes: Set<SpuCode>) = throw NotImplementedError()
+    override fun skusFiledElsewhere(spuCode: SpuCode, skus: Set<String>) = throw NotImplementedError()
 
     override fun search(criteria: ProductSearchCriteria, page: Page) = throw NotImplementedError()
     override fun countAll() = rows.size.toLong()

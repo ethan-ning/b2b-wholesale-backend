@@ -76,11 +76,23 @@ interface SellfoxSkuLinkRepository {
     fun skusFor(fullCids: Set<String>): Set<String>
 }
 
+/**
+ * What a sync learned about one SKU, kept so the grouping can be recomputed without
+ * asking Sellfox again.
+ *
+ * These are the *inputs* to grouping, not its results. Reading pack quantity back off the
+ * variant would make each regroup depend on the answer the last one gave.
+ */
 data class SellfoxSkuLink(
     val sellfoxSku: String,
     val commodityId: String,
     val fullCid: String,
+    /** Sellfox's own SPU for this SKU, where it had one. */
+    val declaredSpu: String?,
     /** The single-unit SKU this one packs; null when it is itself the base. */
     val baseSellfoxSku: String?,
+    /** How many of [baseSellfoxSku] this SKU holds. */
+    val baseQuantity: Int?,
+    val commodityName: String,
     val lastSeenAt: Instant,
 )

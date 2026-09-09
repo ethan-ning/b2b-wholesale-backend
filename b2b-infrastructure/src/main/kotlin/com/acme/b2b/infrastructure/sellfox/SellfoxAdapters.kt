@@ -30,6 +30,7 @@ class SellfoxCatalogAdapter(private val client: SellfoxApiClient) : SellfoxCatal
         name = path("name").asText(""),
         fullCid = path("fullCid").asText(""),
         fullName = path("fullName").asText(""),
+        declaredSpu = path("spu").asText("").takeIf { it.isNotBlank() },
         weightGrams = path("weight").asText("").toDoubleOrNull(),
         children = path("childSkus").mapNotNull { child ->
             val sku = child.path("sku").asText("")

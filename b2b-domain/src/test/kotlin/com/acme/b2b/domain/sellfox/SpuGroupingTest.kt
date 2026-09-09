@@ -18,12 +18,14 @@ class SpuGroupingTest {
         cid: String = "100010-100020-100030-",
         children: List<SellfoxChild> = emptyList(),
         state: String = "1",
+        declaredSpu: String? = null,
     ) = SellfoxCommodity(
         commodityId = sku.hashCode().toString(),
         sku = sku,
         name = name,
         fullCid = cid,
         fullName = "供应商甲/重卡配件/轮毂盖",
+        declaredSpu = declaredSpu,
         weightGrams = null,
         children = children,
         state = state,
@@ -104,17 +106,103 @@ class SpuGroupingTest {
         assertTrue(families.all { it.members.size == 1 })
     }
 
-    @Test
-    fun `a standalone SKU that merely looks like a pack stays alone`() {
-        // RB-HV08-4 declares no child, so it is not four of anything.
-        val families = group(commodity("RB-HV08-4"), commodity("RB-HV31-4"))
+    // ─── Declared SPU, which outranks everything ─────────────────────────
 
-        assertEquals(listOf("RB-HV08-4", "RB-HV31-4"), families.map { it.spuCode })
-        assertTrue(families.all { it.members.single().packQuantity == 1 })
+    @Test
+    fun `a declared SPU keeps apart what a suffix rule would merge`() {
+        // Live data. These differ by a trailing " S" and Sellfox says they are two
+        // products; a common-prefix rule gives both "AX-K210-ZN" and merges them.
+        val families = group(
+            commodity("AX-K210-ZN-4", declaredSpu = "AX-K210-ZN"),
+            commodity("AX-K210-ZN-6", declaredSpu = "AX-K210-ZN"),
+            commodity("AX-K210-ZN-4 S", declaredSpu = "AX-K210-ZN S"),
+            commodity("AX-K210-ZN-6 S", declaredSpu = "AX-K210-ZN S"),
+        )
+
+        assertEquals(listOf("AX-K210-ZN", "AX-K210-ZN S"), families.map { it.spuCode })
+        assertTrue(families.all { it.basis == SpuGrouping.Basis.DECLARED_SPU })
+        // The pack count sits before the " S", so the quantity comes from the code.
+        assertEquals(listOf(4, 6), families[1].members.map { it.packQuantity })
     }
 
     @Test
-    fun `every SKU sits beneath the SPU it was given`() {
+    fun `a declared SPU is cleaned of anything a product code would not carry`() {
+        val family = group(
+            commodity("VX-SC12-2", declaredSpu = " VX-SC12 拖车桩 "),
+            commodity("VX-SC12-4", declaredSpu = " VX-SC12 拖车桩 "),
+        ).single()
+
+        assertEquals("VX-SC12", family.spuCode)
+    }
+
+    @Test
+    fun `a declared SPU outranks an inferred ladder`() {
+        // Left to the ladder rule these would land on "A-1"; Sellfox says otherwise.
+        val families = group(
+            commodity("A-1-2", declaredSpu = "A-ONE"),
+            commodity("A-1-4", declaredSpu = "A-ONE"),
+        )
+
+        assertEquals(listOf("A-ONE"), families.map { it.spuCode })
+    }
+
+    // ─── Inferred pack ladders, which Sellfox does not declare ───────────
+
+    @Test
+    fun `a pack ladder with nothing declared still groups`() {
+        // Live data: RB-VLM4-* are six plain SKUs with no children, in the same catalog
+        // where NDR24-ORANGE-6 does declare its six.
+        val family = group(
+            commodity("RB-VLM4-1"),
+            commodity("RB-VLM4-2"),
+            commodity("RB-VLM4-4"),
+            commodity("RB-VLM4-8"),
+            commodity("RB-VLM4-12"),
+            commodity("RB-VLM4-16"),
+        ).single()
+
+        assertEquals("RB-VLM4", family.spuCode)
+        assertEquals(SpuGrouping.Axis.PACK_QUANTITY, family.axis)
+        assertEquals(SpuGrouping.Basis.INFERRED_PACK, family.basis)
+        assertEquals(listOf(1, 2, 4, 8, 12, 16), family.members.map { it.packQuantity })
+    }
+
+    @Test
+    fun `a lone SKU carrying a pack count names the product without it`() {
+        // Live data: NDR12-YELLOW-10 is the only SKU of its product, and it holds ten.
+        val families = group(
+            commodity("NDR12-YELLOW-10"),
+            commodity("NDR12-RED-10"),
+        )
+
+        assertEquals(listOf("NDR12-RED", "NDR12-YELLOW"), families.map { it.spuCode })
+        assertTrue(families.all { it.members.single().packQuantity == 10 })
+        // One SKU varies along nothing.
+        assertTrue(families.all { it.axis == null })
+    }
+
+    @Test
+    fun `a pack count is not claimed when the stem is itself a product`() {
+        val families = group(commodity("RB-HV08"), commodity("RB-HV08-4"))
+
+        assertEquals(setOf("RB-HV08", "RB-HV08-4"), families.map { it.spuCode }.toSet())
+    }
+
+    @Test
+    fun `a size is not mistaken for a pack count`() {
+        // "-2XL" has digits at the front of its token; the pack rule needs a space
+        // before any letters, so it does not match.
+        val family = group(
+            commodity("KTG-08-XL"),
+            commodity("KTG-08-2XL"),
+        ).single()
+
+        assertEquals(SpuGrouping.Axis.SIZE, family.axis)
+        assertEquals(listOf("XL", "2XL"), family.members.map { it.variantValue })
+    }
+
+    @Test
+    fun `SKUs are grouped under one code without duplicates`() {
         val families = group(
             commodity("WM7C310J255-QT4-1"),
             commodity("WM7C310J255-QT4-2", children = listOf(SellfoxChild("WM7C310J255-QT4-1", 2))),
@@ -125,17 +213,13 @@ class SpuGroupingTest {
             commodity("RB-HV08-4"),
         )
 
-        // The Product aggregate refuses anything else, so this is the invariant that
-        // decides whether an import lands or throws halfway through.
-        families.forEach { family ->
-            val spu = SpuCode(family.spuCode)
-            family.members.forEach { member ->
-                assertTrue(
-                    SkuCode(member.commodity.sku).belongsTo(spu),
-                    "${member.commodity.sku} does not belong to ${family.spuCode}",
-                )
-            }
-        }
+        // Every SPU code must be constructible and unique, and no SKU may appear twice —
+        // those are what decide whether an import lands or throws halfway through.
+        val codes = families.map { SpuCode(it.spuCode).value }
+        assertEquals(codes.size, codes.distinct().size, "duplicate SPU codes: $codes")
+
+        val skus = families.flatMap { it.members }.map { SkuCode(it.commodity.sku).value }
+        assertEquals(skus.size, skus.distinct().size, "a SKU landed in two families")
     }
 
     @Test
@@ -178,7 +262,9 @@ class SpuGroupingTest {
         // no sibling sizes there is no run, so there is nothing to infer.
         val families = group(commodity("RB-QF01-S"), commodity("RB-HV08-4"))
 
-        assertEquals(setOf("RB-QF01-S", "RB-HV08-4"), families.map { it.spuCode }.toSet())
+        // RB-QF01-S keeps its size token: no sibling sizes, so there is no run to infer.
+        // RB-HV08-4 loses its pack count, which is the separate rule for a lone count.
+        assertEquals(setOf("RB-QF01-S", "RB-HV08"), families.map { it.spuCode }.toSet())
         assertTrue(families.all { it.axis == null })
     }
 
@@ -228,7 +314,7 @@ class SpuGroupingTest {
             commodity("RB-HV08-4", state = "1"),
         )
 
-        assertEquals(listOf("RB-HV08-4"), families.map { it.spuCode })
+        assertEquals(listOf("RB-HV08"), families.map { it.spuCode })
     }
 
     @Test
@@ -254,7 +340,9 @@ class SpuGroupingTest {
 
         val family = SpuGrouping.group(all) { it.fullCid == "WANTED-" }.single()
 
+        // The declared child is out of scope, so the count comes from the code instead —
+        // and lands on the same answer, which is the point of having both rules.
         assertEquals(4, family.members.single().packQuantity)
-        assertEquals("WM7C310J255-QT4-4", family.spuCode)
+        assertEquals("WM7C310J255-QT4", family.spuCode)
     }
 }

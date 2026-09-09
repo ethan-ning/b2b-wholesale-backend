@@ -10,9 +10,15 @@ import com.acme.b2b.types.VariantAxis
  * single [variantAxis] — size for apparel, pack quantity for parts.
  *
  * Invariants enforced here, so no caller can assemble a nonsensical product:
- *  - every SKU code sits beneath this SPU code
  *  - a multi-SKU product declares an axis
  *  - SKU codes are unique within the product
+ *
+ * There is deliberately no rule that a SKU code start with the SPU code. It held while
+ * the catalog was hand-made, and the ERP's does not obey it: Sellfox files
+ * "AX-K210-ZN-4 S" under the SPU "AX-K210-ZN S", where the pack count sits before the
+ * suffix rather than after the whole code. Since the ERP owns grouping, requiring its
+ * codes to nest lexically would reject the grouping it declared — enforcing our
+ * convention against the source of truth.
  */
 class Product(
     val id: Long?,
@@ -36,11 +42,6 @@ class Product(
     init {
         require(name.isNotBlank()) { "Product name must not be blank" }
         require(variants.isNotEmpty()) { "Product $spuCode has no SKUs" }
-
-        val offenders = variants.filterNot { it.sku.belongsTo(spuCode) }
-        require(offenders.isEmpty()) {
-            "SKUs must sit beneath $spuCode: ${offenders.joinToString { it.sku.value }}"
-        }
 
         val duplicates = variants.groupBy { it.sku }.filterValues { it.size > 1 }.keys
         require(duplicates.isEmpty()) { "Duplicate SKUs in $spuCode: $duplicates" }

@@ -22,6 +22,13 @@ enum class SyncMode {
 
     /** Stock only, for the selected warehouses. */
     INVENTORY,
+
+    /**
+     * Recompute the SPU grouping from what is already imported. Touches no Sellfox
+     * endpoint, so it costs seconds rather than the two minutes a full run needs to
+     * page a catalog whose facts have not changed.
+     */
+    REGROUP,
 }
 
 enum class RunStatus { RUNNING, SUCCESS, FAILED }

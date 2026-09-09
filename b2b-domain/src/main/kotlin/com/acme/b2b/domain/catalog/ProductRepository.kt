@@ -49,6 +49,16 @@ interface ProductRepository {
      */
     fun deactivateSyncedProductsNotIn(spuCodes: Set<SpuCode>): Int
 
+    /**
+     * Which of [skus] currently sit under a product other than [spuCode].
+     *
+     * A SKU belongs to exactly one product, so when the grouping changes it has to be
+     * *moved*, not inserted — an import that tries to add it to its new product hits the
+     * unique key and abandons the run. The import asks first and leaves those families to
+     * the regroup step, which is the only path that can re-file a SKU.
+     */
+    fun skusFiledElsewhere(spuCode: SpuCode, skus: Set<String>): Set<String>
+
     fun countAll(): Long
     fun countByStatus(status: ProductStatus): Long
 }

@@ -41,6 +41,7 @@ class SellfoxSyncService(
     private val scope: SellfoxScopeRepository,
     private val products: ProductRepository,
     private val stock: ProductStockRepository,
+    private val grouping: ProductGroupingRepository,
     private val links: SellfoxSkuLinkRepository,
     private val runner: SyncRunner,
     private val clock: Clock,
@@ -58,9 +59,82 @@ class SellfoxSyncService(
         return runner.run(SyncMode.FULL, trigger, triggeredBy) { counts ->
             val now = clock.instant()
             val catalog = importCatalog(counts, now)
+            // Reconciles the whole set the import just built. The import files one family
+            // at a time and cannot move a SKU that another product still owns, which is
+            // what happens whenever the grouping rules change; this is the step that can.
+            val regrouped = regroupFromLinks(counts)
             val inventory = applyStock(counts, now)
-            "$catalog $inventory"
+            "$catalog $regrouped $inventory"
         }
+    }
+
+    /**
+     * Recomputes the SPU grouping from what is already imported, touching no Sellfox
+     * endpoint.
+     *
+     * Grouping is a calculation over facts a sync already recorded — the declared SPU,
+     * the declared pack children, the SKU codes. When the calculation improves, the
+     * catalog is wrong in a way that needs no new facts to fix, and a full run would
+     * spend two minutes re-paging a catalog that has not changed to arrive at the same
+     * inputs.
+     *
+     * Run after every full sync for the same reason: the import files each family as it
+     * is built, and this is what reconciles the whole set afterwards.
+     */
+    fun regroup(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun =
+        runner.run(SyncMode.REGROUP, trigger, triggeredBy) { counts -> regroupFromLinks(counts) }
+
+    private fun regroupFromLinks(counts: SyncCounts): String {
+        val links = links.findAll()
+        counts.read(links.size)
+        if (links.isEmpty()) return "Nothing imported yet, so there was nothing to regroup."
+
+        // Rebuilt from the recorded inputs, not from the last grouping's output — reading
+        // pack quantity off the variant would make each run depend on the previous answer.
+        val commodities = links.map { link ->
+            SellfoxCommodity(
+                commodityId = link.commodityId,
+                sku = link.sellfoxSku,
+                name = link.commodityName,
+                fullCid = link.fullCid,
+                fullName = "",
+                declaredSpu = link.declaredSpu,
+                weightGrams = null,
+                children = link.baseSellfoxSku
+                    ?.let { base -> listOf(SellfoxChild(base, link.baseQuantity ?: 1)) }
+                    .orEmpty(),
+                state = ACTIVE_STATE,
+            )
+        }
+
+        val families = SpuGrouping.group(commodities) { true }
+        val outcome = grouping.regroup(
+            families.mapNotNull { family ->
+                runCatching { SpuCode(family.spuCode) }.getOrNull() ?: return@mapNotNull null
+                RegroupedFamily(
+                    spuCode = family.spuCode,
+                    name = family.name,
+                    axisLabel = when (family.axis) {
+                        SpuGrouping.Axis.PACK_QUANTITY -> VariantAxis.PACK_QUANTITY.label
+                        SpuGrouping.Axis.SIZE -> VariantAxis.SIZE.label
+                        null -> null
+                    },
+                    members = family.members.mapIndexed { index, member ->
+                        RegroupedSku(
+                            sku = member.commodity.sku,
+                            variantValue = member.variantValue,
+                            packQuantity = member.packQuantity,
+                            sortOrder = index,
+                        )
+                    },
+                )
+            }
+        )
+        counts.wrote(outcome.skusMoved + outcome.productsCreated)
+
+        return if (!outcome.changed) "${families.size} products; grouping already correct."
+        else "${families.size} products: ${outcome.productsCreated} new, " +
+            "${outcome.skusMoved} SKUs re-filed, ${outcome.emptyProductsRemoved} emptied products removed."
     }
 
     /**
@@ -135,12 +209,14 @@ class SellfoxSyncService(
 
         val created = outcome.count { (_, result) -> result == Outcome.CREATED }
         val updated = outcome.count { (_, result) -> result == Outcome.UPDATED }
+        val deferred = outcome.count { (_, result) -> result == Outcome.DEFERRED }
         val rejected = outcome.filter { (_, result) -> result == Outcome.FAILED }.map { (family, _) -> family.spuCode }
 
         return buildString {
             append("${families.size} products from ${selected.size} categor")
             append(if (selected.size == 1) "y" else "ies")
             append(" ($created new, $updated updated")
+            if (deferred > 0) append(", $deferred regrouped")
             if (deactivated > 0) append(", $deactivated deactivated")
             if (rejected.isNotEmpty()) {
                 // Named, not just counted. "15 could not be built" tells an admin
@@ -187,6 +263,25 @@ class SellfoxSyncService(
         fullName.split('/').take(GROUP_DEPTH).joinToString("/")
 
     private fun importFamily(family: SpuGrouping.Family, now: Instant): Outcome {
+        // Recorded first, and whatever happens to the product. These are the facts the
+        // commodity stated, and a regroup starts from them — a family that defers its
+        // filing must not also defer saying what it knows.
+        family.members.forEach { member ->
+            val child = member.commodity.children.singleOrNull()
+            links.save(
+                SellfoxSkuLink(
+                    sellfoxSku = member.commodity.sku,
+                    commodityId = member.commodity.commodityId,
+                    fullCid = member.commodity.fullCid,
+                    declaredSpu = member.commodity.declaredSpu,
+                    baseSellfoxSku = child?.sku,
+                    baseQuantity = child?.quantity,
+                    commodityName = member.commodity.name,
+                    lastSeenAt = now,
+                )
+            )
+        }
+
         val product = try {
             buildProduct(family, now)
         } catch (ex: IllegalArgumentException) {
@@ -196,21 +291,17 @@ class SellfoxSyncService(
             return Outcome.FAILED
         }
 
+        // A SKU sits under exactly one product. If one of these is still filed elsewhere
+        // — which is what a changed grouping rule leaves behind — inserting it would trip
+        // the unique key and abandon the run, so the regroup step re-files it instead.
+        val elsewhere = products.skusFiledElsewhere(
+            product.spuCode,
+            product.variants.map { it.sku.value }.toSet(),
+        )
+        if (elsewhere.isNotEmpty()) return Outcome.DEFERRED
+
         val existing = products.findBySpuCode(product.spuCode)
         if (existing == null) products.create(product) else products.saveSynced(product, existing)
-
-        val baseSku = family.members.firstOrNull { it.isBase }?.commodity?.sku
-        family.members.forEach { member ->
-            links.save(
-                SellfoxSkuLink(
-                    sellfoxSku = member.commodity.sku,
-                    commodityId = member.commodity.commodityId,
-                    fullCid = member.commodity.fullCid,
-                    baseSellfoxSku = if (member.isBase) null else baseSku,
-                    lastSeenAt = now,
-                )
-            )
-        }
         return if (existing == null) Outcome.CREATED else Outcome.UPDATED
     }
 
@@ -303,7 +394,13 @@ class SellfoxSyncService(
         }
     }
 
-    private enum class Outcome { CREATED, UPDATED, FAILED }
+    private enum class Outcome {
+        CREATED,
+        UPDATED,
+        /** Left to the regroup step, which is the only path that can move a SKU. */
+        DEFERRED,
+        FAILED,
+    }
 
     private companion object {
         val GRAMS_PER_KILO: BigDecimal = BigDecimal(1000)
@@ -313,5 +410,8 @@ class SellfoxSyncService(
 
         /** Enough to act on; the run summary is a line, not a report. */
         const val REJECTS_NAMED = 8
+
+        /** Sellfox's active lifecycle state — everything reaching a regroup is already it. */
+        const val ACTIVE_STATE = "1"
     }
 }

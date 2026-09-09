@@ -42,6 +42,17 @@ class SellfoxSyncScheduler(private val sync: SellfoxSyncService) {
     fun fullSync() = guard("full") { sync.syncFull(TriggerSource.SCHEDULED) }
 
     /**
+     * Regrouping on its own, between full runs.
+     *
+     * Cheap — it reads no Sellfox endpoint — but also usually a no-op: the inputs only
+     * change when a full run brings in new SKUs, and that run regroups already. It earns
+     * its place when the grouping rules themselves change, where it fixes the catalog in
+     * seconds instead of a two-minute re-page of a catalog that has not moved.
+     */
+    @Scheduled(cron = "\${sellfox.schedule.regroup-cron}", zone = "\${sellfox.schedule.zone}")
+    fun regroup() = guard("regroup") { sync.regroup(TriggerSource.SCHEDULED) }
+
+    /**
      * A scheduled method that throws is logged by Spring and then simply not retried, and
      * an unhandled error can silence the schedule entirely. The run record already holds
      * the failure in a form an admin can read, so this only has to stop it escaping.

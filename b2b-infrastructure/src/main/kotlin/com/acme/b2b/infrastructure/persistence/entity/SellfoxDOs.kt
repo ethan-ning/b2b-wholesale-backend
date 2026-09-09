@@ -57,8 +57,17 @@ class SellfoxSkuLinkDO(
     @Column(name = "full_cid", nullable = false)
     var fullCid: String = "",
 
+    @Column(name = "declared_spu")
+    var declaredSpu: String? = null,
+
     @Column(name = "base_sellfox_sku")
     var baseSellfoxSku: String? = null,
+
+    @Column(name = "base_quantity")
+    var baseQuantity: Int? = null,
+
+    @Column(name = "commodity_name")
+    var commodityName: String? = null,
 
     @Column(name = "last_seen_at", nullable = false)
     var lastSeenAt: Instant = Instant.EPOCH,

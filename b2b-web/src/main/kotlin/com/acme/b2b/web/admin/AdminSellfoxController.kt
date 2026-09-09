@@ -57,7 +57,10 @@ class AdminSellfoxController(
      * outcome — the same place a scheduled run reports it, so there is one way to read
      * what happened rather than two.
      */
-    /** `mode=inventory` refreshes stock only; the default is a full run. */
+    /**
+     * `mode=inventory` refreshes stock only, `mode=regroup` recomputes the SPU grouping
+     * without calling Sellfox. The default is a full run.
+     */
     @PostMapping("/runs")
     fun trigger(@RequestParam(required = false) mode: String?): SellfoxSyncRun {
         val by = currentAdminEmail()
@@ -69,9 +72,12 @@ class AdminSellfoxController(
         if (admin.running()) throw UseCaseViolation("A sync is already running")
         sync.requireScopeChosen()
 
-        val inventoryOnly = mode?.equals("inventory", ignoreCase = true) == true
         return start(TriggerSource.MANUAL) {
-            if (inventoryOnly) sync.syncInventory(it, by) else sync.syncFull(it, by)
+            when (mode?.lowercase()) {
+                "inventory" -> sync.syncInventory(it, by)
+                "regroup" -> sync.regroup(it, by)
+                else -> sync.syncFull(it, by)
+            }
         }
     }
 

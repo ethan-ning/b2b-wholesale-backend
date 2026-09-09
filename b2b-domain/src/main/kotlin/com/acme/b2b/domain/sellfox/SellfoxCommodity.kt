@@ -15,6 +15,12 @@ data class SellfoxCommodity(
     val fullCid: String,
     /** Path of category names, e.g. "供应商甲/重卡配件/轮毂盖". */
     val fullName: String,
+    /**
+     * Sellfox's own SPU, when whoever entered the product filled it in — which they have
+     * on well under one percent of rows. Where present it outranks anything derivable
+     * from the SKU text.
+     */
+    val declaredSpu: String?,
     val weightGrams: Double?,
     /**
      * What this SKU is made of. Empty for a plain SKU; one entry for a pack; more than

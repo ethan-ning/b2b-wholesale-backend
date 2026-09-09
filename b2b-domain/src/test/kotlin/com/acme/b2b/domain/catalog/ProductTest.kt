@@ -17,11 +17,34 @@ import kotlin.test.assertTrue
 class ProductTest {
 
     @Test
-    fun `rejects a SKU that does not sit beneath the product`() {
+    fun `accepts the grouping the ERP declares, even when codes do not nest`() {
+        // Sellfox files "AX-K210-ZN-4 S" under the SPU "AX-K210-ZN S": the pack count
+        // sits before the suffix, so the SKU does not start with the SPU code. The ERP
+        // owns grouping, so requiring its codes to nest would reject what it declared.
+        val product = product(
+            spuCode = "AX-K210-ZN S",
+            variants = listOf(
+                variant("AX-K210-ZN-4 S", "4"),
+                variant("AX-K210-ZN-6 S", "6"),
+            ),
+            axis = VariantAxis.PACK_QUANTITY,
+        )
+
+        assertEquals(2, product.variants.size)
+    }
+
+    @Test
+    fun `rejects the same SKU twice in one product`() {
         val error = assertFailsWith<IllegalArgumentException> {
-            product(spuCode = "GL100-BLK", variants = listOf(variant("JK400-BLK-M", "M")))
+            product(
+                variants = listOf(
+                    variant("GL100-BLK-M", "M"),
+                    variant("GL100-BLK-M", "M"),
+                ),
+                axis = VariantAxis.SIZE,
+            )
         }
-        assertTrue(error.message!!.contains("JK400-BLK-M"))
+        assertTrue(error.message!!.contains("Duplicate"), error.message)
     }
 
     @Test

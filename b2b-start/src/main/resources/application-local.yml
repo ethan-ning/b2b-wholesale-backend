@@ -35,6 +35,7 @@ sellfox:
     enabled: ${SELLFOX_SCHEDULE_ENABLED:false}
     inventory-cron: ${SELLFOX_INVENTORY_CRON:0 5 * * * *}
     full-cron: ${SELLFOX_FULL_CRON:0 15 2 * * *}
+    regroup-cron: ${SELLFOX_REGROUP_CRON:0 45 */4 * * *}
     zone: ${SELLFOX_SCHEDULE_ZONE:America/Chicago}
 
 logging:

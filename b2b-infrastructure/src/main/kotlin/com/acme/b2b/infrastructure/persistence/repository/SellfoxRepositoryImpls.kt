@@ -105,14 +105,26 @@ class SellfoxSkuLinkRepositoryImpl(
                 sellfoxSku = link.sellfoxSku,
                 commodityId = link.commodityId,
                 fullCid = link.fullCid,
+                declaredSpu = link.declaredSpu,
                 baseSellfoxSku = link.baseSellfoxSku,
+                baseQuantity = link.baseQuantity,
+                commodityName = link.commodityName,
                 lastSeenAt = link.lastSeenAt,
             )
         )
     }
 
     override fun findAll(): List<SellfoxSkuLink> = jpa.findAll().map {
-        SellfoxSkuLink(it.sellfoxSku, it.commodityId, it.fullCid, it.baseSellfoxSku, it.lastSeenAt)
+        SellfoxSkuLink(
+            sellfoxSku = it.sellfoxSku,
+            commodityId = it.commodityId,
+            fullCid = it.fullCid,
+            declaredSpu = it.declaredSpu,
+            baseSellfoxSku = it.baseSellfoxSku,
+            baseQuantity = it.baseQuantity,
+            commodityName = it.commodityName.orEmpty(),
+            lastSeenAt = it.lastSeenAt,
+        )
     }
 
     override fun skusFor(fullCids: Set<String>): Set<String> =
@@ -195,5 +207,78 @@ class ProductStockRepositoryImpl(
         }
         variants.saveAll(rows)
         return rows.size
+    }
+}
+
+/**
+ * Re-files SKUs when the grouping changes.
+ *
+ * Works at row level rather than through the Product aggregate: a SKU moving between
+ * products cannot be expressed as saving one aggregate, and the unique constraint on
+ * product_variant.sku means the move has to be a reparent rather than an insert-then-delete.
+ */
+@Repository
+class ProductGroupingRepositoryImpl(
+    private val products: com.acme.b2b.infrastructure.persistence.jpa.ProductJpaRepository,
+    private val variants: com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository,
+) : com.acme.b2b.domain.catalog.ProductGroupingRepository {
+
+    override fun regroup(
+        families: List<com.acme.b2b.domain.catalog.RegroupedFamily>,
+    ): com.acme.b2b.domain.catalog.RegroupOutcome {
+        val bySpu = products.findBySourceIn(listOf(SELLFOX)).associateBy { it.spuCode }
+        var created = 0
+        var moved = 0
+
+        families.forEach { family ->
+            val target = bySpu[family.spuCode] ?: run {
+                created++
+                products.save(
+                    com.acme.b2b.infrastructure.persistence.entity.ProductDO(
+                        spuCode = family.spuCode,
+                        name = family.name,
+                        source = SELLFOX,
+                        // Imported products are inactive until priced, and a product this
+                        // run invents has never been priced.
+                        status = com.acme.b2b.domain.catalog.ProductStatus.INACTIVE.name,
+                        createdAt = Instant.now(),
+                        updatedAt = Instant.now(),
+                    )
+                )
+            }
+            target.variantAxis = family.axisLabel
+            target.name = family.name
+            target.updatedAt = Instant.now()
+            products.save(target)
+
+            family.members.forEach { member ->
+                val row = variants.findBySkuIn(listOf(member.sku)).firstOrNull() ?: return@forEach
+                if (row.product?.id != target.id) {
+                    row.product = target
+                    moved++
+                }
+                row.variantValue = member.variantValue
+                row.packQuantity = member.packQuantity
+                row.sortOrder = member.sortOrder
+                variants.save(row)
+            }
+        }
+
+        // Flush the reparenting before looking for empties: the rows that left are still
+        // pending, so a product would otherwise still look occupied by SKUs it has lost.
+        variants.flush()
+
+        val emptied = products.findBySourceIn(listOf(SELLFOX)).filter { it.variants.isEmpty() }
+        products.deleteAll(emptied)
+
+        return com.acme.b2b.domain.catalog.RegroupOutcome(
+            productsCreated = created,
+            skusMoved = moved,
+            emptyProductsRemoved = emptied.size,
+        )
+    }
+
+    private companion object {
+        const val SELLFOX = "SELLFOX"
     }
 }

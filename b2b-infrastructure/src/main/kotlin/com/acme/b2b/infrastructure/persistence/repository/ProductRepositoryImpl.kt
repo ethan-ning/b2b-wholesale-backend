@@ -27,6 +27,7 @@ import org.springframework.stereotype.Repository
 @Repository
 class ProductRepositoryImpl(
     private val jpa: ProductJpaRepository,
+    private val variants: com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository,
     private val converter: ProductDataConverter,
     private val tierPrices: TierPriceRepository,
     private val categories: CategoryRepository,
@@ -108,6 +109,14 @@ class ProductRepositoryImpl(
         stale.forEach { it.status = ProductStatus.INACTIVE.name }
         jpa.saveAll(stale)
         return stale.size
+    }
+
+    override fun skusFiledElsewhere(spuCode: SpuCode, skus: Set<String>): Set<String> {
+        if (skus.isEmpty()) return emptySet()
+        return variants.findBySkuIn(skus)
+            .filter { it.product?.spuCode != spuCode.value }
+            .map { it.sku }
+            .toSet()
     }
 
     override fun save(product: Product): Product {
