@@ -1,6 +1,5 @@
 package com.acme.b2b.application.sellfox
 
-import com.acme.b2b.domain.sellfox.SellfoxJob
 import com.acme.b2b.domain.sellfox.SellfoxScopeRepository
 import com.acme.b2b.domain.sellfox.SellfoxSyncRun
 import com.acme.b2b.domain.sellfox.SellfoxSyncRunRepository
@@ -23,12 +22,10 @@ class SellfoxAdminService(
         warehouses = scope.warehouses(),
     )
 
-    fun history(job: SellfoxJob?, limit: Int): List<SellfoxSyncRun> =
-        runs.recent(job, limit.coerceIn(1, MAX_HISTORY))
+    fun history(limit: Int): List<SellfoxSyncRun> = runs.recent(limit.coerceIn(1, MAX_HISTORY))
 
     /** True while a run is in flight, so the trigger button can say so before it 409s. */
-    fun running(): Map<SellfoxJob, Boolean> =
-        SellfoxJob.entries.associateWith { runs.isRunning(it) }
+    fun running(): Boolean = runs.isRunning()
 
     @Transactional
     fun selectCategory(cid: String, selected: Boolean) = scope.setCategorySelected(cid, selected)

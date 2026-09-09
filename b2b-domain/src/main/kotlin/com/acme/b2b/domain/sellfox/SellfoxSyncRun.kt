@@ -2,22 +2,19 @@ package com.acme.b2b.domain.sellfox
 
 import java.time.Instant
 
-enum class SellfoxJob { CATALOG, INVENTORY }
-
 enum class TriggerSource { SCHEDULED, MANUAL }
 
 enum class RunStatus { RUNNING, SUCCESS, FAILED }
 
 /**
- * One execution of a sync job — including the ones that failed, and the ones still going.
+ * One execution of the sync — including the ones that failed, and the ones still going.
  *
- * A run is written before the work starts, not after it finishes. A job that dies
+ * A run is written before the work starts, not after it finishes. A run that dies
  * halfway would otherwise leave no trace at all, and "no row" would mean both "never
  * ran" and "crashed", which are the two cases an admin most needs to tell apart.
  */
 data class SellfoxSyncRun(
     val id: Long?,
-    val job: SellfoxJob,
     val trigger: TriggerSource,
     val status: RunStatus,
     /** The admin who pressed the button; null for scheduled runs. */
@@ -34,10 +31,9 @@ data class SellfoxSyncRun(
         /** Long enough to be diagnostic, short enough that a stack trace cannot fill a page. */
         private const val MAX_ERROR_LENGTH = 2000
 
-        fun started(job: SellfoxJob, trigger: TriggerSource, triggeredBy: String?, at: Instant) =
+        fun started(trigger: TriggerSource, triggeredBy: String?, at: Instant) =
             SellfoxSyncRun(
                 id = null,
-                job = job,
                 trigger = trigger,
                 status = RunStatus.RUNNING,
                 triggeredBy = triggeredBy,
@@ -83,9 +79,9 @@ class SyncCounts {
 
 interface SellfoxSyncRunRepository {
     fun save(run: SellfoxSyncRun): SellfoxSyncRun
-    fun recent(job: SellfoxJob?, limit: Int): List<SellfoxSyncRun>
-    /** True while a run of this job is still RUNNING — used to refuse a concurrent start. */
-    fun isRunning(job: SellfoxJob): Boolean
+    fun recent(limit: Int): List<SellfoxSyncRun>
+    /** True while a run is still RUNNING — used to refuse a concurrent start. */
+    fun isRunning(): Boolean
 
     /**
      * Closes runs left RUNNING by a process that died. Without this a crash wedges the

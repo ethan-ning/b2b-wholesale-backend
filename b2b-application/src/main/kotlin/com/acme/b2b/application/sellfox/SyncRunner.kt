@@ -1,7 +1,6 @@
 package com.acme.b2b.application.sellfox
 
 import com.acme.b2b.application.support.UseCaseViolation
-import com.acme.b2b.domain.sellfox.SellfoxJob
 import com.acme.b2b.domain.sellfox.SellfoxSyncRun
 import com.acme.b2b.domain.sellfox.SellfoxSyncRunRepository
 import com.acme.b2b.domain.sellfox.SyncCounts
@@ -12,8 +11,8 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 
 /**
- * Wraps a sync in its run record. Both jobs go through here so that history, concurrency
- * and failure handling are written once and cannot drift apart between them.
+ * Wraps the sync in its run record — history, concurrency and failure handling in one
+ * place, separate from what the sync actually does.
  *
  * The run row is committed before the work starts and again after it ends, in their own
  * transactions. Sharing the job's transaction would roll the record back with the
@@ -26,16 +25,15 @@ class SyncRunner(
 ) {
 
     fun run(
-        job: SellfoxJob,
         trigger: TriggerSource,
         triggeredBy: String?,
         work: (SyncCounts) -> String,
     ): SellfoxSyncRun {
-        if (runs.isRunning(job)) {
-            throw UseCaseViolation("A $job sync is already running")
+        if (runs.isRunning()) {
+            throw UseCaseViolation("A sync is already running")
         }
 
-        val started = begin(job, trigger, triggeredBy)
+        val started = begin(trigger, triggeredBy)
         val counts = SyncCounts()
 
         return try {
@@ -48,8 +46,8 @@ class SyncRunner(
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun begin(job: SellfoxJob, trigger: TriggerSource, triggeredBy: String?): SellfoxSyncRun =
-        runs.save(SellfoxSyncRun.started(job, trigger, triggeredBy, clock.instant()))
+    fun begin(trigger: TriggerSource, triggeredBy: String?): SellfoxSyncRun =
+        runs.save(SellfoxSyncRun.started(trigger, triggeredBy, clock.instant()))
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun finish(run: SellfoxSyncRun): SellfoxSyncRun = runs.save(run)

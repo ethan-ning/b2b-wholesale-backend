@@ -118,7 +118,6 @@ class SellfoxSyncRunRepositoryImpl(
 
     override fun save(run: SellfoxSyncRun): SellfoxSyncRun {
         val row = run.id?.let { jpa.findById(it).orElse(null) } ?: SellfoxSyncRunDO()
-        row.job = run.job.name
         row.triggerSource = run.trigger.name
         row.status = run.status.name
         row.triggeredBy = run.triggeredBy
@@ -132,15 +131,10 @@ class SellfoxSyncRunRepositoryImpl(
         return jpa.save(row).toDomain()
     }
 
-    override fun recent(job: SellfoxJob?, limit: Int): List<SellfoxSyncRun> {
-        val page = PageRequest.of(0, limit)
-        val rows = if (job == null) jpa.findAllByOrderByStartedAtDesc(page)
-        else jpa.findByJobOrderByStartedAtDesc(job.name, page)
-        return rows.map { it.toDomain() }
-    }
+    override fun recent(limit: Int): List<SellfoxSyncRun> =
+        jpa.findAllByOrderByStartedAtDesc(PageRequest.of(0, limit)).map { it.toDomain() }
 
-    override fun isRunning(job: SellfoxJob): Boolean =
-        jpa.existsByJobAndStatus(job.name, RunStatus.RUNNING.name)
+    override fun isRunning(): Boolean = jpa.existsByStatus(RunStatus.RUNNING.name)
 
     override fun failInterrupted(reason: String, at: Instant): Int {
         val stale = jpa.findByStatus(RunStatus.RUNNING.name)
@@ -155,7 +149,6 @@ class SellfoxSyncRunRepositoryImpl(
 
     private fun SellfoxSyncRunDO.toDomain() = SellfoxSyncRun(
         id = id,
-        job = SellfoxJob.valueOf(job),
         trigger = TriggerSource.valueOf(triggerSource),
         status = RunStatus.valueOf(status),
         triggeredBy = triggeredBy,

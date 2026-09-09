@@ -70,9 +70,6 @@ class SellfoxSyncRunDO(
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    @Column(nullable = false)
-    var job: String = "",
-
     @Column(name = "trigger_source", nullable = false)
     var triggerSource: String = "",
 

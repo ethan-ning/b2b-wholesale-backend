@@ -133,7 +133,6 @@ interface SellfoxSkuLinkJpaRepository : JpaRepository<SellfoxSkuLinkDO, String> 
 
 interface SellfoxSyncRunJpaRepository : JpaRepository<SellfoxSyncRunDO, Long> {
     fun findAllByOrderByStartedAtDesc(pageable: Pageable): List<SellfoxSyncRunDO>
-    fun findByJobOrderByStartedAtDesc(job: String, pageable: Pageable): List<SellfoxSyncRunDO>
-    fun existsByJobAndStatus(job: String, status: String): Boolean
+    fun existsByStatus(status: String): Boolean
     fun findByStatus(status: String): List<SellfoxSyncRunDO>
 }
