@@ -104,6 +104,11 @@ class ProductAdminService(
         val saved = products.save(updated)
         command.tierPrices.takeIf { it.isNotEmpty() }?.let { savePriceBook(saved, it) }
 
+        // Checked after the prices are written, so one save can set both — but checked,
+        // because this form carries a visibility field and would otherwise be a way round
+        // the rule that setVisible enforces. The transaction rolls back on refusal.
+        requireSellableIfVisible(saved)
+
         return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
     }
 
@@ -122,16 +127,12 @@ class ProductAdminService(
             return AdminProductDTO(toDto(existing, categoryNames()), priceBookOf(existing))
         }
 
-        // Refused rather than allowed and hidden later. An unpriced product that reaches
-        // the catalog is offered to dealers at its base price, and for an ERP import that
-        // is zero — the one mistake this flag can make that costs money.
-        if (active && !existing.isSellable(pricedSkusOf(existing))) {
-            throw UseCaseViolation(
-                "Set tier pricing for every SKU of ${existing.spuCode} before showing it to dealers"
-            )
-        }
+        // The product as it would be, not as it is — `existing` is still hidden here, so
+        // asking it whether it may be visible answers about the wrong thing.
+        val intended = existing.withVisibility(visibility)
+        requireSellableIfVisible(intended)
 
-        val saved = products.save(existing.withVisibility(visibility))
+        val saved = products.save(intended)
         return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
     }
 
@@ -174,6 +175,22 @@ class ProductAdminService(
                 },
             )
         }
+    }
+
+    /**
+     * Refuses to leave a product visible that no dealer could buy from.
+     *
+     * An unpriced product in the catalog is offered at its base price, and for an ERP
+     * import that is zero — the one mistake this flag can make that costs money. Every
+     * path that can set visibility goes through here; a rule enforced on only one of two
+     * routes is not enforced.
+     */
+    private fun requireSellableIfVisible(product: Product) {
+        if (!product.isVisible) return
+        if (product.isSellable(pricedSkusOf(product))) return
+        throw UseCaseViolation(
+            "Set tier pricing for every SKU of ${product.spuCode} before showing it to dealers"
+        )
     }
 
     /** SKUs of this product that carry at least one tier price. */

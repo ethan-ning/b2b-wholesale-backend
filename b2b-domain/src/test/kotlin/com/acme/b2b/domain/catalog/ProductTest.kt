@@ -115,6 +115,42 @@ class ProductTest {
     }
 
     @Test
+    fun `a discontinued SKU does not have to be priced`() {
+        // The supplier stopped selling it, so it is not something to offer — and it must
+        // not hold the rest of the product back from going on sale.
+        val gloves = product(
+            variants = listOf(
+                variant("GL100-BLK-S", "S"),
+                variant("GL100-BLK-M", "M").let {
+                    ProductVariant(
+                        it.id, it.sku, it.variantValue, it.packQuantity, it.mapPrice, it.upc,
+                        it.weight, it.sortOrder, active = false, stock = it.stock,
+                    )
+                },
+            ),
+            axis = VariantAxis.SIZE,
+        )
+
+        assertTrue(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"))))
+    }
+
+    @Test
+    fun `a product whose every SKU is discontinued is not sellable`() {
+        val gone = product(
+            variants = listOf(
+                variant("GL100-BLK-S", "S").let {
+                    ProductVariant(
+                        it.id, it.sku, it.variantValue, it.packQuantity, it.mapPrice, it.upc,
+                        it.weight, it.sortOrder, active = false, stock = it.stock,
+                    )
+                },
+            ),
+        )
+
+        assertFalse(gone.isSellable(setOf(SkuCode("GL100-BLK-S"))))
+    }
+
+    @Test
     fun `a freshly imported product is not sellable`() {
         // What an ERP import looks like: real SKUs, no tier prices anywhere.
         assertFalse(product().isSellable(emptySet()))
