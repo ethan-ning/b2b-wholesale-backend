@@ -5,3 +5,10 @@ build/
 *.iml
 .DS_Store
 local.properties
+
+# Credentials never belong in the tree. Listed even though none are committed today:
+# in a public repo an accidental commit is permanent, and the Sellfox and database
+# secrets are read from the environment precisely so they can stay out.
+.env
+.env.*
+*.local.yml
