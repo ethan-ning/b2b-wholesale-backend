@@ -8,6 +8,9 @@ plugins {
 dependencies {
     api(project(":b2b-domain"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // BCrypt for the PasswordHasher port, and Nimbus (via the resource server) for JWTs.
+    implementation("org.springframework.security:spring-security-crypto")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -16,6 +16,12 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+security:
+  jwt:
+    # Override in every real environment. HS256 needs at least 256 bits of key material.
+    secret: ${JWT_SECRET:change-me-in-every-environment-at-least-32-bytes-long}
+    ttl-minutes: ${JWT_TTL_MINUTES:480}
+
 server:
   port: 8080
 

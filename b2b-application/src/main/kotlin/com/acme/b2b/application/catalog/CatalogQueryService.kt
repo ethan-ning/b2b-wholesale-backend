@@ -4,6 +4,8 @@ import com.acme.b2b.application.catalog.dto.CategoryDTO
 import com.acme.b2b.application.catalog.dto.PagedDTO
 import com.acme.b2b.application.catalog.dto.ProductDTO
 import com.acme.b2b.application.support.DealerContext
+import com.acme.b2b.domain.common.Page
+import com.acme.b2b.domain.common.PageOf
 import com.acme.b2b.domain.catalog.*
 import com.acme.b2b.domain.pricing.PricingPolicy
 import com.acme.b2b.domain.pricing.ResolvedPrice

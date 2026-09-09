@@ -1,5 +1,7 @@
 package com.acme.b2b.domain.catalog
 
+import com.acme.b2b.domain.common.Page
+import com.acme.b2b.domain.common.PageOf
 import com.acme.b2b.types.SpuCode
 
 /**

@@ -3,6 +3,7 @@ package com.acme.b2b.infrastructure.persistence.jpa
 import com.acme.b2b.infrastructure.persistence.entity.*
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.query.Param
 
 /**
@@ -43,3 +44,30 @@ interface ProductCategoryJpaRepository : JpaRepository<ProductCategoryDO, Long> 
 }
 
 interface CustomerTierJpaRepository : JpaRepository<CustomerTierDO, Long>
+
+interface AdminUserJpaRepository : JpaRepository<AdminUserDO, Long> {
+    fun findByEmail(email: String): AdminUserDO?
+}
+
+interface CustomerJpaRepository : JpaRepository<CustomerDO, Long> {
+    fun findByEmail(email: String): CustomerDO?
+    fun existsByEmail(email: String): Boolean
+    fun existsByTierId(tierId: Long): Boolean
+
+    @Query(
+        """
+        SELECT c FROM CustomerDO c
+        WHERE (:status IS NULL OR c.status = :status)
+          AND (:text IS NULL
+               OR LOWER(c.name) LIKE :text
+               OR LOWER(c.email) LIKE :text
+               OR LOWER(c.companyName) LIKE :text)
+        ORDER BY c.id
+        """
+    )
+    fun search(
+        @Param("text") text: String?,
+        @Param("status") status: String?,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<CustomerDO>
+}
