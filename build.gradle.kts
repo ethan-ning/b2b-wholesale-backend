@@ -5,9 +5,10 @@ plugins {
     id("org.springframework.boot") apply false
 }
 
-// Versions come from gradle.properties.
-val javaVersion: String by project
-val springBootVersion: String by project
+// Versions come from gradle.properties. Dotted names cannot use the `by project`
+// delegate, which requires the property name to match the variable name.
+val javaVersion = providers.gradleProperty("java.version").get()
+val springBootVersion = providers.gradleProperty("spring-boot.version").get()
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")

@@ -3,8 +3,8 @@
 // can, so each plugin is versioned once in this block and applied without a version
 // everywhere else.
 pluginManagement {
-    val kotlinVersion: String by settings
-    val springBootVersion: String by settings
+    val kotlinVersion = providers.gradleProperty("kotlin.version").get()
+    val springBootVersion = providers.gradleProperty("spring-boot.version").get()
 
     plugins {
         kotlin("jvm") version kotlinVersion

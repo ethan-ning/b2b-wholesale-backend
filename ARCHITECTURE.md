@@ -123,9 +123,21 @@ platform, so no module names a library version.
 
 ### Where versions live
 
-Everything is in **`gradle.properties`** — project coordinates, `javaVersion`,
-`kotlinVersion`, `springBootVersion`, and how the build runs. No `build.gradle.kts`
+Everything is in **`gradle.properties`** — project coordinates, `java.version`,
+`kotlin.version`, `spring-boot.version`, and how the build runs. No `build.gradle.kts`
 contains a version literal.
+
+The dotted names cost one small thing: Gradle's `by project` / `by settings` delegates
+require the property name to match the variable name, so these are read explicitly with
+`providers.gradleProperty("kotlin.version").get()`. That `.get()` fails the build if the
+property is missing, rather than falling back to a default:
+
+```
+Cannot query the value of Gradle property 'kotlin.version' because it has no value available.
+```
+
+`java.version` as a *project* property does not collide with the JVM system property of
+the same name — separate namespaces, verified.
 
 Two mechanics make that work:
 
