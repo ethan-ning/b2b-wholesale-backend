@@ -55,8 +55,19 @@ class CatalogQueryService(
         )
     }
 
+    /**
+     * A product by its code, or null when a dealer has no business seeing it.
+     *
+     * Search filters on visibility, but this route did not, so a hidden product came back
+     * with a 200 to anyone who knew the code — and codes are guessable from the ones on
+     * display. Hidden has to mean hidden on every route, not just the one people browse.
+     *
+     * A product with nothing on sale is treated the same way: there is nothing to buy, and
+     * an empty SKU table is a worse answer than not found.
+     */
     fun findBySpuCode(spuCode: String): ProductDTO? {
         val product = products.findBySpuCode(SpuCode(spuCode)) ?: return null
+        if (!product.isVisible || product.onSaleVariants.isEmpty()) return null
         return toDTO(product, dealerContext.currentTierId(), categoryNames())
     }
 
@@ -67,11 +78,12 @@ class CatalogQueryService(
      * assembles. Pricing a page is one query for the whole page, not one per SKU.
      */
     private fun toDTO(product: Product, tierId: TierId, categoryNames: Map<Long, String>): ProductDTO {
-        val priceBook = tierPrices.findFor(product.variants.map { it.sku }, tierId)
-        val resolved: Map<String, ResolvedPrice> = product.variants.associate { variant ->
+        val onSale = product.onSaleVariants
+        val priceBook = tierPrices.findFor(onSale.map { it.sku }, tierId)
+        val resolved: Map<String, ResolvedPrice> = onSale.associate { variant ->
             variant.sku.value to PricingPolicy.resolve(product, variant, tierId, priceBook)
         }
-        return ProductAssembler.toDTO(product, resolved, categoryNames)
+        return ProductAssembler.toDTO(product, resolved, categoryNames, variants = onSale)
     }
 
     private fun categoryNames(): Map<Long, String> {

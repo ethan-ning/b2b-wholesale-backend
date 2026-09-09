@@ -114,6 +114,28 @@ class ProductTest {
         assertFalse(gloves.isSellable(emptySet()))
     }
 
+    /** The same SKU as the supplier would leave it after withdrawing it. */
+    private fun withdrawn(v: ProductVariant) = ProductVariant(
+        v.id, v.sku, v.variantValue, v.packQuantity, v.mapPrice, v.upc,
+        v.weight, v.sortOrder, active = false, stock = v.stock,
+    )
+
+    @Test
+    fun `a dealer is offered only the SKUs still on sale`() {
+        val gloves = product(
+            variants = listOf(
+                variant("GL100-BLK-S", "S"),
+                withdrawn(variant("GL100-BLK-M", "M")),
+            ),
+            axis = VariantAxis.SIZE,
+        )
+
+        // The withdrawn one stays on the product so its pricing survives, but showing it
+        // would be offering to sell something that cannot be bought.
+        assertEquals(2, gloves.variants.size)
+        assertEquals(listOf("GL100-BLK-S"), gloves.onSaleVariants.map { it.sku.value })
+    }
+
     @Test
     fun `a discontinued SKU does not have to be priced`() {
         // The supplier stopped selling it, so it is not something to offer — and it must
@@ -121,12 +143,7 @@ class ProductTest {
         val gloves = product(
             variants = listOf(
                 variant("GL100-BLK-S", "S"),
-                variant("GL100-BLK-M", "M").let {
-                    ProductVariant(
-                        it.id, it.sku, it.variantValue, it.packQuantity, it.mapPrice, it.upc,
-                        it.weight, it.sortOrder, active = false, stock = it.stock,
-                    )
-                },
+                withdrawn(variant("GL100-BLK-M", "M")),
             ),
             axis = VariantAxis.SIZE,
         )
@@ -138,12 +155,7 @@ class ProductTest {
     fun `a product whose every SKU is discontinued is not sellable`() {
         val gone = product(
             variants = listOf(
-                variant("GL100-BLK-S", "S").let {
-                    ProductVariant(
-                        it.id, it.sku, it.variantValue, it.packQuantity, it.mapPrice, it.upc,
-                        it.weight, it.sortOrder, active = false, stock = it.stock,
-                    )
-                },
+                withdrawn(variant("GL100-BLK-S", "S")),
             ),
         )
 

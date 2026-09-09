@@ -15,11 +15,17 @@ import com.acme.b2b.domain.pricing.ResolvedPrice
  */
 object ProductAssembler {
 
+    /**
+     * [variants] is which SKUs to render: the admin sees them all, a dealer sees only
+     * what is still on sale. Passed in rather than decided here, because the caller is
+     * the one that knows whose view this is.
+     */
     fun toDTO(
         product: Product,
         prices: Map<String, ResolvedPrice>,
         categoryNames: Map<Long, String>,
         sellable: Boolean? = null,
+        variants: List<ProductVariant> = product.variants,
     ): ProductDTO =
         ProductDTO(
             id = product.id,
@@ -43,7 +49,7 @@ object ProductAssembler {
             images = product.imageUrls.mapIndexed { index, url ->
                 ProductImageDTO(id = null, url = url, altText = product.name, sortOrder = index)
             },
-            variants = product.variants.map { variant ->
+            variants = variants.map { variant ->
                 toDTO(variant, prices.getValue(variant.sku.value))
             },
         )

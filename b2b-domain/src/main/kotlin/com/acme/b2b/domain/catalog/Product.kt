@@ -54,6 +54,16 @@ class Product(
     val isVisible: Boolean get() = visibility == ProductVisibility.VISIBLE
 
     /**
+     * The SKUs a dealer may buy — everything the supplier still sells.
+     *
+     * A discontinued SKU is kept on the product so its pricing survives the supplier
+     * dropping it and returning to it, but it is not on offer, and showing one is
+     * offering to sell something that cannot be bought. The admin sees all of them; this
+     * is what the dealer sees.
+     */
+    val onSaleVariants: List<ProductVariant> get() = variants.filter { it.active }
+
+    /**
      * Whether this product could be shown to a dealer at all, whatever [visibility] says.
      *
      * An ERP import arrives with no dealer price — Sellfox knows cost and stock, not what
