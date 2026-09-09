@@ -55,10 +55,7 @@ class AdminSellfoxController(
     fun runs(@RequestParam(defaultValue = "25") limit: Int): SyncHistoryDTO =
         SyncHistoryDTO(runs = admin.history(limit), running = admin.running())
 
-    /**
-     * `mode=inventory` refreshes stock only, `mode=regroup` recomputes the SPU grouping
-     * without calling Sellfox. The default is a full run.
-     */
+    /** `mode=inventory` refreshes stock only. The default is a full run. */
     @PostMapping("/runs")
     fun trigger(@RequestParam(required = false) mode: String?): SyncRunDTO {
         val by = currentAdminEmail()
@@ -66,11 +63,7 @@ class AdminSellfoxController(
         sync.requireScopeChosen()
 
         return start(TriggerSource.MANUAL) {
-            when (mode?.lowercase()) {
-                "inventory" -> sync.syncInventory(it, by)
-                "regroup" -> sync.regroup(it, by)
-                else -> sync.syncFull(it, by)
-            }
+            if (mode?.lowercase() == "inventory") sync.syncInventory(it, by) else sync.syncFull(it, by)
         }
     }
 

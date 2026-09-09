@@ -57,16 +57,6 @@ class SellfoxSyncService(
     }
 
     /**
-     * Regrouping alone, touching no Sellfox endpoint.
-     *
-     * Not scheduled: between full runs its inputs do not change, so a cron would only
-     * confirm the previous answer. What makes it worth running is a change to the
-     * grouping rules, which is a deploy rather than an hour of the day.
-     */
-    fun regroup(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun =
-        runner.run(SyncMode.REGROUP, trigger, triggeredBy) { counts -> regrouper.regroup(counts) }
-
-    /**
      * Refuses a run that would import nothing.
      *
      * Both selections are required, not either: a category with no warehouse imports

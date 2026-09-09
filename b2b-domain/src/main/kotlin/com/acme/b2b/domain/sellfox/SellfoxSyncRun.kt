@@ -23,7 +23,12 @@ enum class SyncMode {
     /** Stock only, for the selected warehouses. */
     INVENTORY,
 
-    /** Recompute the SPU grouping from what is already imported. Touches no Sellfox endpoint. */
+    /**
+     * Recompute the SPU grouping from what is already imported.
+     *
+     * Nothing starts one on its own any more — a regroup is a step inside [FULL]. Kept so
+     * the runs that predate that still read back.
+     */
     REGROUP,
 }
 

@@ -4,10 +4,7 @@ import com.acme.b2b.domain.sellfox.SpuGrouping
 import com.acme.b2b.types.SpuCode
 import com.acme.b2b.types.VariantAxis
 
-/**
- * Between what the grouping calculation produces and what the catalog stores. Shared by
- * the importer and the regrouper, which build products from the same families.
- */
+/** Between what the grouping calculation produces and what the catalog stores. */
 
 /**
  * True when the derived code is one the catalog will accept. Grouping works in plain

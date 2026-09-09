@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component
 
 /**
  * The cron side of the Sellfox sync: two cadences over the one scope, hourly stock and a
- * nightly full run. Regrouping is deliberately not scheduled — see [SellfoxSyncService].
+ * nightly full run, which regroups as one of its steps.
  *
  * Lives in the start module because it drives the application layer, and `checkLayering`
  * forbids an adapter module from depending on that. A scheduler is a trigger like a
