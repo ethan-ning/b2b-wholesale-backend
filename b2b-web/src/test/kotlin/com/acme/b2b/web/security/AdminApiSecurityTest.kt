@@ -9,6 +9,7 @@ import com.acme.b2b.application.admin.ProductAdminService
 import com.acme.b2b.application.admin.dto.AdminLoginResponse
 import com.acme.b2b.application.admin.dto.AdminUserDTO
 import com.acme.b2b.application.catalog.CatalogQueryService
+import com.acme.b2b.application.dealer.DealerAuthService
 import com.acme.b2b.application.catalog.dto.PagedDTO
 import com.acme.b2b.web.support.ApiExceptionHandler
 import com.nimbusds.jose.JWSAlgorithm
@@ -48,7 +49,12 @@ private const val SECRET = "test-secret-that-is-at-least-32-bytes-long"
  * token is signed.
  */
 @WebMvcTest
-@Import(WebSecurityConfig::class, ApiExceptionHandler::class, AdminApiSecurityTest.TestBeans::class)
+@Import(
+    WebSecurityConfig::class,
+    ApiExceptionHandler::class,
+    com.acme.b2b.web.support.JwtDealerContext::class,
+    AdminApiSecurityTest.TestBeans::class,
+)
 class AdminApiSecurityTest {
 
     @TestConfiguration
@@ -72,6 +78,7 @@ class AdminApiSecurityTest {
     @MockitoBean private lateinit var categoryAdmin: CategoryAdminService
     @MockitoBean private lateinit var inventoryQuery: InventoryQueryService
     @MockitoBean private lateinit var dashboard: DashboardService
+    @MockitoBean private lateinit var dealerAuth: DealerAuthService
 
     private val adminToken = token(scope = "ADMIN", secret = SECRET)
     private val dealerToken = token(scope = "DEALER", secret = SECRET)
@@ -127,6 +134,46 @@ class AdminApiSecurityTest {
                 .andExpect(status().isForbidden)
             mockMvc.perform(get(path)).andExpect(status().isUnauthorized)
         }
+    }
+
+    @Test
+    fun `dealer login is reachable without a token`() {
+        mockMvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"dealer@example.com","password":"whatever1"}""")
+        ).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `a password-change token reaches only the change-password endpoint`() {
+        val pwToken = token(scope = "PASSWORD_CHANGE", secret = SECRET)
+
+        // The one thing it may do.
+        mockMvc.perform(
+            post("/api/auth/change-password")
+                .header("Authorization", "Bearer $pwToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"currentPassword":"issued-one","newPassword":"chosen-one"}""")
+        ).andExpect(status().isOk)
+
+        // And nothing else — not the catalog it was issued against, nor the back office.
+        mockMvc.perform(get("/api/products").header("Authorization", "Bearer $pwToken"))
+            .andExpect(status().isForbidden)
+        mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $pwToken"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `a dealer token reaches the catalog and its own password change`() {
+        mockMvc.perform(get("/api/products").header("Authorization", "Bearer $dealerToken"))
+            .andExpect(status().isOk)
+        mockMvc.perform(
+            post("/api/auth/change-password")
+                .header("Authorization", "Bearer $dealerToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"currentPassword":"old-one-1","newPassword":"new-one-1"}""")
+        ).andExpect(status().isOk)
     }
 
     @Test

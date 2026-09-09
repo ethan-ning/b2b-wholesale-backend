@@ -105,6 +105,29 @@ Carried over from the frontend's design work — see the portal repo's
   `ProductDataConverter.applyTo` deliberately does not write stock columns, so saving a
   product cannot undo a sync.
 
+## Dealer portal surface
+
+| Route | Notes |
+|---|---|
+| `POST /api/auth/login` | BCrypt verify; token carries `scope: DEALER` and the dealer's `tierId` |
+| `POST /api/auth/change-password` | ends a forced change and returns a full catalog token |
+| `GET /api/products`, `/api/products/{spuCode}`, `/api/categories` | priced for the tier in the token |
+
+**The forced password change is enforced, not requested.** A dealer still on the password
+an admin generated receives a token whose only reachable endpoint is
+`/api/auth/change-password` — `scope: PASSWORD_CHANGE`, valid 30 minutes. The catalog and
+the back office both return 403 to it. The client is told via `mustChangePassword` so it
+can route sensibly, but nothing depends on the client honouring that.
+
+**The tier travels in the token**, so pricing a catalog request costs no lookup. The trade
+is that a tier change reaches a dealer only at their next login, and a disabled dealer
+keeps catalog access until their token expires — acceptable while tiers change rarely and
+by deliberate act, but the reason the TTL should not grow.
+
+Login failures are indistinguishable: wrong password, unknown email and disabled account
+all return the same 401, so the endpoint cannot be used to enumerate dealers or discover
+who has been suspended.
+
 ## Admin portal surface
 
 | Route | Notes |
@@ -156,8 +179,6 @@ Deliberate, in rough priority order:
    `ProductRepositoryImpl` resolves in memory after loading, which is correct for the
    current catalog size but does not scale. The fix is a materialised
    `(sku, tier_id, price)` view that can be joined and sorted in SQL.
-2. **No authentication.** `HeaderDealerContext` reads the tier from `X-Dealer-Tier`.
-   Replace with a JWT adapter; nothing above the port changes.
 3. **Admin write use cases are not built** — only the dealer read slice is. The ports
    (`save`, `replaceFor`, `deleteById`) exist and are implemented.
 4. **`StockSyncPort` has no adapter yet.** The scheduled sync job is the next vertical

@@ -57,7 +57,17 @@ class JwtAccessTokenIssuer(
                 .claim("tierId", tierId)
         )
 
-    private fun sign(claims: JWTClaimsSet.Builder): String {
+    override fun issuePasswordChangeToken(customerId: Long, email: String): String =
+        sign(
+            JWTClaimsSet.Builder()
+                .subject(customerId.toString())
+                .claim("email", email)
+                .claim("scope", "PASSWORD_CHANGE"),
+            // Short-lived: it exists to get through one screen, not to hold a session.
+            ttlMinutes = 30,
+        )
+
+    private fun sign(claims: JWTClaimsSet.Builder, ttlMinutes: Long = this.ttlMinutes): String {
         val now = Instant.now()
         val jwt = SignedJWT(
             JWSHeader(JWSAlgorithm.HS256),

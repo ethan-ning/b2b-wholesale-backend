@@ -86,4 +86,5 @@ class FixedTemporaryPasswordGenerator(private val value: String = "TempPass1234"
 class FakeTokenIssuer : AccessTokenIssuer {
     override fun issueForAdmin(adminId: Long, email: String, role: String) = "admin-token:$adminId:$role"
     override fun issueForDealer(customerId: Long, email: String, tierId: Long) = "dealer-token:$customerId:$tierId"
+    override fun issuePasswordChangeToken(customerId: Long, email: String) = "pwchange-token:$customerId"
 }

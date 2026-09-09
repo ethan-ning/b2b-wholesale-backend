@@ -39,6 +39,11 @@ class WebSecurityConfig {
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/auth/login", "/api/admin/auth/login").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
+                    // A dealer still on an admin-issued password holds a token whose only
+                    // reachable endpoint is this one. That is what makes the forced change
+                    // enforced rather than merely requested of the client.
+                    .requestMatchers("/api/auth/change-password")
+                        .hasAnyAuthority("SCOPE_DEALER", "SCOPE_PASSWORD_CHANGE")
                     // The rule that matters most: a dealer token must not reach the
                     // back office. Enforced by scope, not by role or by path alone.
                     .requestMatchers("/api/admin/**").hasAuthority("SCOPE_ADMIN")
