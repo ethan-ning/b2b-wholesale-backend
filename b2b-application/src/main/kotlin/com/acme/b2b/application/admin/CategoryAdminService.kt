@@ -18,7 +18,15 @@ class CategoryAdminService(
     private val categories: CategoryRepository,
 ) {
 
-    fun tree(): List<CategoryNodeDTO> = categories.findTree().map { it.toDto() }
+    /**
+     * The tree, annotated with what an admin needs before acting: how many products sit in
+     * each node, and whether it can be deleted. Counts come from one query for the whole
+     * tree, so this does not become one query per node.
+     */
+    fun tree(): List<CategoryNodeDTO> {
+        val counts = categories.productCountsByCategory()
+        return categories.findTree().map { it.toDto(counts) }
+    }
 
     @Transactional
     fun create(command: CreateCategoryCommand): CategoryNodeDTO {
@@ -80,12 +88,24 @@ class CategoryAdminService(
             .first { !categories.existsBySlug(it) }
     }
 
-    private fun Category.toDto(): CategoryNodeDTO = CategoryNodeDTO(
-        id = id,
-        name = name,
-        slug = slug,
-        parentId = parentId,
-        sortOrder = sortOrder,
-        children = children.map { it.toDto() },
-    )
+    private fun Category.toDto(counts: Map<Long, Long> = emptyMap()): CategoryNodeDTO {
+        val productCount = id?.let { counts[it] } ?: 0
+        // Mirrors delete()'s rules, so the button's state and the API agree.
+        val blockedReason = when {
+            children.isNotEmpty() -> "Has ${children.size} sub-categor${if (children.size == 1) "y" else "ies"}"
+            productCount > 0 -> "Has $productCount product${if (productCount == 1L) "" else "s"}"
+            else -> null
+        }
+        return CategoryNodeDTO(
+            id = id,
+            name = name,
+            slug = slug,
+            parentId = parentId,
+            sortOrder = sortOrder,
+            productCount = productCount,
+            deletable = blockedReason == null,
+            blockedReason = blockedReason,
+            children = children.map { it.toDto(counts) },
+        )
+    }
 }

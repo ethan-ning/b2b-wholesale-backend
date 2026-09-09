@@ -25,6 +25,11 @@ class CategoryRepositoryImpl(
 
     override fun existsBySlug(slug: String): Boolean = jpa.existsBySlug(slug)
 
+    override fun productCountsByCategory(): Map<Long, Long> =
+        productCategories.countsByCategory().associate { (categoryId, count) ->
+            categoryId as Long to (count as Number).toLong()
+        }
+
     override fun findTree(): List<Category> {
         val all = jpa.findAll()
         val byParent = all.groupBy { it.parentId }

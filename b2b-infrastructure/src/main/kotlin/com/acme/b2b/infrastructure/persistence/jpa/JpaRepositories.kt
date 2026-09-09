@@ -78,6 +78,9 @@ interface CategoryJpaRepository : JpaRepository<CategoryDO, Long> {
 interface ProductCategoryJpaRepository : JpaRepository<ProductCategoryDO, Long> {
     fun findByCategoryIdIn(categoryIds: Collection<Long>): List<ProductCategoryDO>
     fun existsByCategoryId(categoryId: Long): Boolean
+
+    @Query("SELECT pc.categoryId, COUNT(pc) FROM ProductCategoryDO pc GROUP BY pc.categoryId")
+    fun countsByCategory(): List<Array<Any>>
 }
 
 interface CustomerTierJpaRepository : JpaRepository<CustomerTierDO, Long>

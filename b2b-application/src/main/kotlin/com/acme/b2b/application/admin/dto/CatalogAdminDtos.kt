@@ -27,6 +27,14 @@ data class CategoryNodeDTO(
     val slug: String,
     val parentId: Long?,
     val sortOrder: Int,
+    /** Products filed directly under this node, not counting its sub-categories. */
+    val productCount: Long,
+    /**
+     * Whether this node can be deleted, and why not. The same rules the API enforces, so
+     * the admin sees the outcome before pressing the button rather than after a 409.
+     */
+    val deletable: Boolean,
+    val blockedReason: String?,
     val children: List<CategoryNodeDTO>,
 )
 

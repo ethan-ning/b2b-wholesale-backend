@@ -20,6 +20,13 @@ interface CategoryRepository {
     fun deleteById(id: Long)
 
     fun hasChildren(categoryId: Long): Boolean
+
+    /**
+     * Products filed directly under each category, for the whole tree in one query.
+     * Returned as a map rather than a per-node call so rendering the tree does not become
+     * one query per node.
+     */
+    fun productCountsByCategory(): Map<Long, Long>
     /** True when any product is filed under it — deleting would orphan them. */
     fun isAssignedToProducts(categoryId: Long): Boolean
     fun existsBySlug(slug: String): Boolean
