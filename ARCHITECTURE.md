@@ -141,27 +141,37 @@ that the two are in step.
 
 ### Configuration profiles
 
+**`application.yml` is production.** Running with no profile gives production settings, so
+a deployment that forgets to set one fails loudly rather than quietly starting on
+developer defaults. Local development is the deviation.
+
 | File | Holds |
 |---|---|
-| `application.yml` | true everywhere: JPA settings, Flyway location, `spring.profiles.default: local` |
-| `application-local.yml` | defaults matching `compose.yaml`, a dev JWT secret, DEBUG logging |
-| `application-prod.yml` | `${DB_URL}`, `${JWT_SECRET}` and friends with **no fallbacks**, pool sizing, INFO logging, health endpoint only |
+| `application.yml` | everything: datasource with no fallbacks, pool sizing, JPA, Flyway, INFO logging, health endpoint only |
+| `application-local.yml` | only what differs locally — credentials matching `compose.yaml`, a throwaway signing key, DEBUG logging |
 
-A bare `java -jar` is a developer, so `local` is the default profile; production sets
-`SPRING_PROFILES_ACTIVE=prod`.
+`application-local.yml` overrides four values and inherits the rest, so the two cannot
+drift apart.
 
-The prod profile deliberately has no fallback values, so an unset variable cannot quietly
-resolve to a development credential. On its own that fails obscurely — Hikari reports
-`'url' must start with "jdbc"` from deep inside bean creation, which does not say that
-`DB_URL` was never set. `RequiredSettingsCheck`, an `EnvironmentPostProcessor`, therefore
-reports first, before any bean exists:
+```bash
+./gradlew :b2b-start:bootRun                  # sets the local profile for you
+SPRING_PROFILES_ACTIVE=local java -jar ...    # same, by hand
+java -jar ...                                 # production: requires the environment
+```
+
+The baseline has no fallback values, so an unset variable cannot resolve to something that
+happens to be in version control. On its own that fails obscurely — Hikari reports
+`'url' must start with "jdbc"` from inside bean creation, never mentioning `DB_URL`.
+`RequiredSettingsCheck`, an `EnvironmentPostProcessor`, reports first:
 
 ```
-Cannot start with profile 'prod': required settings are missing.
+Cannot start: required settings are missing.
   - DB_URL  (binds to spring.datasource.url)
   - JWT_SECRET  (binds to security.jwt.secret)
-Set them in the environment; the prod profile has no fallbacks by design.
+Set them in the environment, or run locally with SPRING_PROFILES_ACTIVE=local.
 ```
+
+It skips any profile that ships its own defaults (`local`, `test`).
 
 ### The application
 

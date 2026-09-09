@@ -1,5 +1,9 @@
-# Local development. Defaults match compose.yaml, so a fresh clone runs with
-# `docker compose up -d` and nothing else.
+# Local development. Overrides only what actually differs from production — the
+# credentials, a throwaway signing key, and noisier logging. Everything else is
+# inherited from application.yml so the two cannot drift apart.
+#
+#   SPRING_PROFILES_ACTIVE=local java -jar ...
+#   ./gradlew :b2b-start:bootRun     (sets the profile for you)
 spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/b2b}
@@ -8,7 +12,6 @@ spring:
 
 security:
   jwt:
-    # Fine on a laptop; the prod profile refuses to start without a real one.
     secret: ${JWT_SECRET:local-development-secret-at-least-32-bytes-long}
 
 logging:

@@ -1,12 +1,24 @@
-# Settings that are true in every environment. Anything that varies — credentials,
-# log levels, pool sizes — belongs in a profile, not here.
+# Production configuration. This is the baseline: running with no profile gives you
+# production settings, so a deployment that forgets to set one fails loudly rather
+# than quietly starting on developer defaults.
+#
+# Local development is the deviation — see application-local.yml.
 spring:
   application:
     name: b2b-wholesale
-  # A bare `java -jar` is a developer running it locally. Production sets
-  # SPRING_PROFILES_ACTIVE=prod explicitly.
-  profiles:
-    default: local
+
+  # No fallbacks. An unset variable must not resolve to something that happens to be
+  # in version control. RequiredSettingsCheck reports which one is missing before any
+  # bean is built.
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      connection-timeout: 10000
+
   jpa:
     hibernate:
       ddl-auto: validate    # Flyway owns the schema; Hibernate only checks it
@@ -14,14 +26,34 @@ spring:
     properties:
       hibernate:
         jdbc.time_zone: UTC
+
   flyway:
     enabled: true
     # Migrations ship in b2b-infrastructure, beside the DOs whose tables they create.
     locations: classpath:db/migration
+    # A migration edited after being applied elsewhere is a deployment accident.
+    validate-on-migrate: true
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    ttl-minutes: ${JWT_TTL_MINUTES:480}
 
 server:
   port: ${SERVER_PORT:8080}
 
-security:
-  jwt:
-    ttl-minutes: ${JWT_TTL_MINUTES:480}
+logging:
+  level:
+    root: INFO
+    com.acme.b2b: INFO
+
+# Health for the load balancer; nothing else exposed.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

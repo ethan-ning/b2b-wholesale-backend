@@ -8,16 +8,17 @@ import org.springframework.core.env.ConfigurableEnvironment
  * Fails startup with a readable message when a required setting is missing.
  *
  * Without this the failure still happens, but as `'url' must start with "jdbc"` from
- * deep inside Hikari's bean creation — which does not tell whoever is deploying that
- * DB_URL was never set. Running as an EnvironmentPostProcessor means it reports before
- * any bean is built, so the message is the first thing in the log rather than the last.
+ * deep inside Hikari's bean creation, which never mentions that DB_URL was unset.
+ * Running as an EnvironmentPostProcessor means the report comes before any bean is
+ * built, so it is the first thing in the log rather than the last.
  *
- * Only the prod profile is checked: local supplies working defaults on purpose.
+ * Production is the baseline configuration, so the check applies by default. A profile
+ * that ships working defaults of its own opts out.
  */
 class RequiredSettingsCheck : EnvironmentPostProcessor {
 
     override fun postProcessEnvironment(environment: ConfigurableEnvironment, application: SpringApplication) {
-        if (PROD_PROFILE !in environment.activeProfiles) return
+        if (environment.activeProfiles.any { it in PROFILES_WITH_DEFAULTS }) return
 
         val missing = REQUIRED.filterNot { (_, variable) ->
             environment.getProperty(variable)?.isNotBlank() == true
@@ -26,17 +27,22 @@ class RequiredSettingsCheck : EnvironmentPostProcessor {
 
         throw IllegalStateException(
             buildString {
-                appendLine("Cannot start with profile '$PROD_PROFILE': required settings are missing.")
+                appendLine("Cannot start: required settings are missing.")
                 missing.forEach { (property, variable) ->
                     appendLine("  - $variable  (binds to $property)")
                 }
-                append("Set them in the environment; the prod profile has no fallbacks by design.")
+                append(
+                    "Set them in the environment, or run locally with " +
+                        "SPRING_PROFILES_ACTIVE=local. The default configuration is production " +
+                        "and has no fallbacks by design."
+                )
             }
         )
     }
 
     private companion object {
-        const val PROD_PROFILE = "prod"
+        /** Profiles that supply their own defaults, so nothing is required of the environment. */
+        val PROFILES_WITH_DEFAULTS = setOf("local", "test")
 
         /** property it binds to -> environment variable that supplies it */
         val REQUIRED = mapOf(
