@@ -74,8 +74,7 @@ class SellfoxSyncService(
      * catalog that is not there. The exception is a first run, when there is nothing to
      * choose from yet — that run is how the lists get filled.
      *
-     * Public because a caller that dispatches the sync to another thread has to ask
-     * before dispatching; an exception thrown on that thread has nowhere to go.
+     * Public so a caller dispatching the sync to another thread can ask before it does.
      */
     fun requireScopeChosen() {
         val knownCategories = scope.categories()

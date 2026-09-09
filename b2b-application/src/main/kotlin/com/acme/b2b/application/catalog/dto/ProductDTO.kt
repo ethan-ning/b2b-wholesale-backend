@@ -22,9 +22,8 @@ data class ProductDTO(
     /** VISIBLE or HIDDEN — the portal's only lever. Not the ERP's on-sale state. */
     val visibility: String,
     /**
-     * False when some SKU has no tier price. Such a product cannot be activated: it would
-     * be offered at its base price, which for an ERP import is zero. Null on the
-     * dealer-facing responses, where an unsellable product is simply not returned.
+     * Whether the product could be shown to a dealer at all — see `Product.isSellable`.
+     * Null on the dealer-facing responses, where an unsellable product is not returned.
      */
     val sellable: Boolean? = null,
     val categories: List<ProductCategoryDTO>,

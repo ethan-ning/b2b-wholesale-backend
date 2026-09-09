@@ -104,9 +104,8 @@ class ProductAdminService(
         val saved = products.save(updated)
         command.tierPrices.takeIf { it.isNotEmpty() }?.let { savePriceBook(saved, it) }
 
-        // Checked after the prices are written, so one save can set both — but checked,
-        // because this form carries a visibility field and would otherwise be a way round
-        // the rule that setVisible enforces. The transaction rolls back on refusal.
+        // After the prices are written, so one save can set both. The transaction rolls
+        // back on refusal.
         requireSellableIfVisible(saved)
 
         return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
@@ -178,12 +177,9 @@ class ProductAdminService(
     }
 
     /**
-     * Refuses to leave a product visible that no dealer could buy from.
-     *
-     * An unpriced product in the catalog is offered at its base price, and for an ERP
-     * import that is zero — the one mistake this flag can make that costs money. Every
-     * path that can set visibility goes through here; a rule enforced on only one of two
-     * routes is not enforced.
+     * Refuses to leave a product visible that no dealer could buy from, per
+     * [Product.isSellable]. Both routes that can set visibility go through here — a rule
+     * enforced on only one of two is not enforced.
      */
     private fun requireSellableIfVisible(product: Product) {
         if (!product.isVisible) return
@@ -246,7 +242,7 @@ class ProductAdminService(
 
     private fun parseVisibility(raw: String): ProductVisibility =
         runCatching { ProductVisibility.valueOf(raw.uppercase()) }
-            .getOrElse { throw UseCaseViolation("Unknown product status: $raw") }
+            .getOrElse { throw UseCaseViolation("Unknown product visibility: $raw") }
 
     private companion object {
         /** Any tier; with an empty price book the policy falls through to list price. */

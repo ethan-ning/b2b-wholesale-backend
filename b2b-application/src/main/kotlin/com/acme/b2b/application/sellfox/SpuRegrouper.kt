@@ -15,12 +15,8 @@ import java.math.RoundingMode
 /**
  * The only place SPU grouping happens.
  *
- * Everything it needs is in `sellfox_sku_link` — what each commodity declared about
- * itself. That is deliberate on both sides: it means grouping can be recomputed without
- * calling Sellfox, and it means the calculation can never come to depend on the answer a
- * previous run gave, which reading pack quantity back off a variant row would do.
- *
- * The import step records those facts and stops. This step decides the structure: which
+ * The import step records what each commodity declared about itself and stops. This step
+ * reads those facts back out of `sellfox_sku_link` and decides the structure: which
  * products exist, which SKUs sit under each, and which products the scope no longer
  * covers. Nothing else in the system arranges SKUs into products.
  */
@@ -56,8 +52,7 @@ class SpuRegrouper(
         val families = SpuGrouping.group(commodities) { true }.filter { it.hasUsableCode() }
         val outcome = grouping.regroup(families.map { it.toRegrouped() })
 
-        // A product holding none of the SKUs just placed is one the scope no longer
-        // covers — the import forgot its links, so nothing here filed anything under it.
+        // A product holding none of the SKUs just placed is one the scope no longer covers.
         val deactivated = grouping.deactivateProductsNotIn(families.map { it.spuCode }.toSet())
 
         counts.wrote(outcome.productsCreated + outcome.skusCreated + outcome.skusMoved)

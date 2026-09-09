@@ -23,11 +23,7 @@ enum class SyncMode {
     /** Stock only, for the selected warehouses. */
     INVENTORY,
 
-    /**
-     * Recompute the SPU grouping from what is already imported. Touches no Sellfox
-     * endpoint, so it costs seconds rather than the two minutes a full run needs to
-     * page a catalog whose facts have not changed.
-     */
+    /** Recompute the SPU grouping from what is already imported. Touches no Sellfox endpoint. */
     REGROUP,
 }
 
@@ -92,7 +88,6 @@ data class SellfoxSyncRun(
         recordsSkipped = counts.skipped,
         errorMessage = (error ?: "Unknown error").take(MAX_ERROR_LENGTH),
     )
-
 }
 
 /** Mutable tally carried through a run so a failure can still report what got done. */
@@ -119,5 +114,5 @@ interface SellfoxSyncRunRepository {
      *
      * Returns how many were closed.
      */
-    fun failInterrupted(reason: String, at: java.time.Instant): Int
+    fun failInterrupted(reason: String, at: Instant): Int
 }

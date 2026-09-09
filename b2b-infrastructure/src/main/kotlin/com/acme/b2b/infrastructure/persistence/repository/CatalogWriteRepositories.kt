@@ -40,13 +40,6 @@ class ProductStockRepositoryImpl(
 }
 
 /**
- * Re-files SKUs when the grouping changes.
- *
- * Works at row level rather than through the Product aggregate: a SKU moving between
- * products cannot be expressed as saving one aggregate, and the unique constraint on
- * product_variant.sku means the move has to be a reparent rather than an insert-then-delete.
- */
-/**
  * Materialises the grouping: creates the products and SKUs it names, moves any SKU that
  * has changed product, and clears out whatever is left holding nothing.
  *
@@ -140,10 +133,7 @@ class ProductGroupingRepositoryImpl(
         return stale.size
     }
 
-    /**
-     * A product this run invents has never been priced, and an unpriced product must not
-     * reach a dealer at $0.00 — so it arrives inactive, like every ERP import.
-     */
+    /** Arrives hidden, like every ERP import: nothing has priced it yet. */
     private fun newProduct(family: RegroupedFamily) = products.save(
         ProductDO(
             spuCode = family.spuCode,

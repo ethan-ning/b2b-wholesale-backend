@@ -17,10 +17,8 @@ import java.time.Instant
  * the category registry, and writes one row per in-scope SKU describing what the commodity
  * declared — its SPU if it has one, the SKU it packs and how many, its name and weight.
  *
- * Keeping it to facts is the point. Grouping used to happen here too, because a product
- * cannot be built without it, and the result was two places deciding how SKUs relate: this
- * one at import time and the regroup step afterwards. One of them was always the stale
- * answer. Now [SpuRegrouper] is the only code that groups, and it works from these rows.
+ * Keeping it to facts is what leaves [SpuRegrouper] the only code that decides how SKUs
+ * relate; two places deciding that would mean one of them always holding a stale answer.
  *
  * The registry is rebuilt from the scan because Sellfox exposes no category endpoint —
  * every commodity carries the full path of ids and names, so the tree is only recoverable
@@ -66,8 +64,6 @@ class SellfoxCatalogImporter(
     }
 
     private fun SellfoxCommodity.toLink(now: Instant): SellfoxSkuLink {
-        // The commodity's own declaration, never a conclusion drawn from it. A regroup has
-        // to start from the same inputs rather than from the last answer.
         val child = children.singleOrNull()
         return SellfoxSkuLink(
             sellfoxSku = sku,

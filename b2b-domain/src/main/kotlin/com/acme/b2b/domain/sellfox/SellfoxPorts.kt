@@ -79,9 +79,6 @@ interface SellfoxSkuLinkRepository {
     /**
      * Forgets SKUs an import no longer saw — their category left the scope, or the
      * supplier dropped them. Returns how many went.
-     *
-     * This is what makes the regroup step able to deactivate: it groups whatever links
-     * survive, and a product with none left is one the scope no longer covers.
      */
     fun deleteSkusNotIn(keep: Set<String>): Int
 }

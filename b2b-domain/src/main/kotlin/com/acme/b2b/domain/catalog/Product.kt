@@ -13,12 +13,9 @@ import com.acme.b2b.types.VariantAxis
  *  - a multi-SKU product declares an axis
  *  - SKU codes are unique within the product
  *
- * There is deliberately no rule that a SKU code start with the SPU code. It held while
- * the catalog was hand-made, and the ERP's does not obey it: Sellfox files
- * "AX-K210-ZN-4 S" under the SPU "AX-K210-ZN S", where the pack count sits before the
- * suffix rather than after the whole code. Since the ERP owns grouping, requiring its
- * codes to nest lexically would reject the grouping it declared — enforcing our
- * convention against the source of truth.
+ * A SKU code deliberately need not start with its SPU code: Sellfox files "AX-K210-ZN-4 S"
+ * under "AX-K210-ZN S", and since the ERP owns grouping, requiring its codes to nest
+ * lexically would reject the grouping it declared.
  */
 class Product(
     val id: Long?,
@@ -74,11 +71,8 @@ class Product(
      * sale must be covered — a half-priced product shows some pack sizes at list price and
      * the rest at nothing, which reads as a bug rather than as a missing price.
      */
-    fun isSellable(pricedSkus: Set<SkuCode>): Boolean {
-        // A SKU the supplier has stopped selling is not something to offer, priced or not.
-        val onSale = variants.filter { it.active }
-        return onSale.isNotEmpty() && onSale.all { it.sku in pricedSkus }
-    }
+    fun isSellable(pricedSkus: Set<SkuCode>): Boolean =
+        onSaleVariants.isNotEmpty() && onSaleVariants.all { it.sku in pricedSkus }
 
     /**
      * Returns the same product in a different visibility state. Everything else is carried

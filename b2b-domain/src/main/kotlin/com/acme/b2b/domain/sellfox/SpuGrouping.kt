@@ -4,46 +4,26 @@ package com.acme.b2b.domain.sellfox
  * Turns a flat list of Sellfox commodities into SPU families.
  *
  * Sellfox is inconsistent about saying how its SKUs relate — the same catalog declares
- * `NDR24-ORANGE-6` as six of `NDR24-ORANGE-1` and leaves `NDR12-YELLOW-10` and the
- * whole `RB-VLM4-*` ladder saying nothing at all. So this reads every signal it has, in
- * order of how much it can be trusted, and only guesses where nothing was declared:
+ * `NDR24-ORANGE-6` as six of `NDR24-ORANGE-1` and leaves the whole `RB-VLM4-*` ladder
+ * saying nothing at all. So this reads every signal it has, most trustworthy first, and
+ * only guesses where nothing was declared:
  *
  *   1. A declared SPU        — Sellfox's own `spu` field. Rare but authoritative.
  *   2. A declared pack       — a SKU naming the single-unit SKU it contains, and how many.
- *   3. An inferred ladder    — RB-VLM4-1/-2/-4/-8/-16: same stem, different pack counts.
- *   4. An inferred size run  — KTG-08-S/M/L/XL.
- *   5. A lone pack count     — NDR12-YELLOW-10 is one SKU of a ten-pack, so the product
- *                              is NDR12-YELLOW.
+ *   3. An inferred ladder    — same stem, different trailing pack counts.
+ *   4. An inferred size run  — same stem, different trailing sizes.
+ *   5. A lone pack count     — one SKU whose code ends in the quantity it holds.
  *
- * The order is the point. A declared relationship is a fact and an inferred one is a
- * guess, so nothing inferred may override something stated. The first two also settle
- * cases no string rule could: `AX-K210-ZN-4` and `AX-K210-ZN-4 S` differ by one trailing
- * token and Sellfox says they are separate products, `AX-K210-ZN` and `AX-K210-ZN S`.
- *
- * Pure: no repository, no clock, no framework.
+ * The order is the point: a declared relationship is a fact and an inferred one is a
+ * guess, so nothing inferred may override something stated.
  */
 object SpuGrouping {
 
     /** What the SKUs of a family vary along. */
     enum class Axis { PACK_QUANTITY, SIZE }
 
-    /** How a family's SPU was arrived at. Carried so a run can report what it relied on. */
-    enum class Basis {
-        /** Sellfox's own `spu` field. */
-        DECLARED_SPU,
-
-        /** A SKU naming the single-unit SKU it packs. */
-        DECLARED_PACK,
-
-        /** Same stem, different trailing pack counts. */
-        INFERRED_PACK,
-
-        /** Same stem, different trailing sizes. */
-        INFERRED_SIZE,
-
-        /** One SKU, standing alone. */
-        SINGLE,
-    }
+    /** Which of the five rules named the family. Carried so a run can report what it relied on. */
+    enum class Basis { DECLARED_SPU, DECLARED_PACK, INFERRED_PACK, INFERRED_SIZE, SINGLE }
 
     /** A family that becomes one Product: an SPU code, and the SKUs beneath it. */
     data class Family(
@@ -109,8 +89,8 @@ object SpuGrouping {
      */
     private fun declaredSpuOf(commodity: SellfoxCommodity): String? =
         commodity.declaredSpu
-            ?.filter { it.isLetterOrDigit() && it.code < 128 || it in ALLOWED_PUNCTUATION }
-            ?.trim(*TRIMMED_ENDS)
+            ?.filter { it.isLetterOrDigit() && it.code < 128 || it in CODE_PUNCTUATION }
+            ?.trim(*CODE_PUNCTUATION)
             ?.takeIf { it.isNotBlank() }
 
     private fun declaredFamily(spu: String, group: List<SellfoxCommodity>): Family {
@@ -189,10 +169,8 @@ object SpuGrouping {
     /**
      * Folds `RB-VLM4-1/-2/-4/-8/-12/-16` into one product on a Pack Qty axis.
      *
-     * Sellfox declares nothing about these — every one is a plain SKU with no children,
-     * in the same catalog where `NDR24-ORANGE-6` does declare its six. So this is a
-     * guess, and it is guarded the way the size rule is: at least two SKUs sharing a
-     * stem, all with different counts, and the stem must not itself be a product.
+     * Guarded, since nothing declared these: at least two SKUs sharing a stem, all with
+     * different counts, and the stem must not itself be a product.
      */
     private fun groupByPackLadder(singles: List<Family>, allSkus: Set<String>): List<Family> {
         val (numbered, plain) = singles.partition { packSuffixOf(it.spuCode) != null }
@@ -239,10 +217,9 @@ object SpuGrouping {
     /**
      * Folds size runs into one family: KTG-08-S, -M, -L, -XL become KTG-08 on a Size axis.
      *
-     * Nothing in Sellfox says these are related, so this is guarded the same way: the
-     * trailing token must be a size from a closed list, and at least two SKUs must share
-     * a stem with different sizes. A lone SKU ending in "-S" stays a product of its own,
-     * which is what keeps "RB-05 SCREW-FT"-shaped codes out of this.
+     * Guarded like the ladder above, plus the trailing token must be a size from a closed
+     * list. A lone SKU ending in "-S" stays a product of its own, which is what keeps
+     * "RB-05 SCREW-FT"-shaped codes out of this.
      */
     private fun groupBySize(singles: List<Family>, allSkus: Set<String>): List<Family> {
         val (sized, plain) = singles.partition { sizeTokenOf(it.spuCode) != null }
@@ -385,10 +362,8 @@ object SpuGrouping {
     /** Digits at the end, optionally followed by a space and letters. */
     private val PACK_SUFFIX = Regex("^(.*)-(\\d+)( [A-Za-z]+)?$")
 
-    /** Kept when cleaning a declared SPU — the rest of a supplier code's alphabet. */
-    private val ALLOWED_PUNCTUATION = charArrayOf(' ', '-', '.', '+', '_', '/')
-
-    private val TRIMMED_ENDS = charArrayOf(' ', '-', '.', '+', '_', '/')
+    /** The rest of a supplier code's alphabet: kept inside a declared SPU, trimmed off its ends. */
+    private val CODE_PUNCTUATION = charArrayOf(' ', '-', '.', '+', '_', '/')
 
     /**
      * The sizes a trailing token may be, smallest first — the list doubles as the display

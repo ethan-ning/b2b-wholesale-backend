@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import java.io.IOException
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
@@ -76,16 +77,15 @@ class SellfoxApiClient(
      * Retries a transport failure a few times, backing off.
      *
      * A catalog run is sixty-odd sequential pages over two minutes, and one dropped
-     * connection two thirds of the way through used to discard all of it. Only network
-     * faults are retried — a signature or credential problem arrives as a business code
-     * and would fail the same way however many times it is asked.
+     * connection two thirds of the way through would otherwise discard all of it. Only
+     * network faults land here; business failures are [post]'s to judge.
      */
     private fun <T> withRetry(path: String, call: () -> T): T {
         var lastFailure: Exception? = null
         repeat(MAX_ATTEMPTS) { attempt ->
             try {
                 return call()
-            } catch (ex: java.io.IOException) {
+            } catch (ex: IOException) {
                 lastFailure = ex
                 log.warn("{} failed on attempt {} of {}: {}", path, attempt + 1, MAX_ATTEMPTS, ex.message)
                 if (attempt < MAX_ATTEMPTS - 1) Thread.sleep(RETRY_BACKOFF_MILLIS * (attempt + 1))
@@ -97,9 +97,9 @@ class SellfoxApiClient(
     /**
      * Pages an endpoint to exhaustion, calling [extract] on each page's `data`.
      *
-     * Paced deliberately: Sellfox rate-limits with code 40019, and a burst of pages is
-     * the reliable way to trip it. A nightly catalog scan is ~65 pages, so the delay
-     * costs about a minute and buys a job that finishes.
+     * Paced deliberately: a burst of pages is the reliable way to trip the rate limit. A
+     * nightly catalog scan is ~65 pages, so the delay costs about a minute and buys a job
+     * that finishes.
      */
     fun <T> pageThrough(
         path: String,
@@ -142,9 +142,9 @@ class SellfoxApiClient(
             .build()
 
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        // The status line is not where the answer is. A rate limit arrives as HTTP 400
-        // carrying code 40019, so throwing on the status would hide the one business code
-        // that is worth retrying. Anything with a code is handed up for post() to judge.
+        // The status line is not where the answer is: a rate limit arrives as HTTP 400
+        // carrying code 40019, so throwing on the status would hide it. Anything with a
+        // code is handed up for post() to judge.
         val parsed = runCatching { mapper.readTree(response.body()) }.getOrNull()
         if (parsed == null || parsed.get("code") == null) {
             throw SellfoxApiException(response.statusCode(), response.body().take(500), path)
@@ -241,8 +241,8 @@ class SellfoxApiClient(
 }
 
 /**
- * Carries Sellfox's own code, which is what actually says what went wrong: 40005 is the
- * IP allowlist, 40019 is the rate limit, and both arrive as HTTP 200.
+ * Carries Sellfox's own code, which is what actually says what went wrong — 40005 is the
+ * IP allowlist, 40019 the rate limit — and which the HTTP status does not reflect.
  */
 class SellfoxApiException(val code: Int, message: String, val path: String) :
     RuntimeException("Sellfox $path failed with code $code: $message")

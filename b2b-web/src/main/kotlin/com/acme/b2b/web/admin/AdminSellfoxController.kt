@@ -42,7 +42,7 @@ class AdminSellfoxController(
      */
     @PutMapping("/scope")
     fun setScope(@RequestBody body: ScopeRequest): SyncRunDTO {
-        if (admin.running()) throw UseCaseViolation("A sync is already running")
+        requireNotRunning()
         // Read here, not inside the lambda: the security context is a thread-local, and
         // the run executes on a pool thread that has none. Read there it comes back null,
         // and the history loses who changed the scope — the one run where that matters.
@@ -56,23 +56,13 @@ class AdminSellfoxController(
         SyncHistoryDTO(runs = admin.history(limit), running = admin.running())
 
     /**
-     * Starts a run and returns its record in RUNNING. The client polls `/runs` for the
-     * outcome — the same place a scheduled run reports it, so there is one way to read
-     * what happened rather than two.
-     */
-    /**
      * `mode=inventory` refreshes stock only, `mode=regroup` recomputes the SPU grouping
      * without calling Sellfox. The default is a full run.
      */
     @PostMapping("/runs")
     fun trigger(@RequestParam(required = false) mode: String?): SyncRunDTO {
         val by = currentAdminEmail()
-
-        // Both checked here, on the request thread. The sync checks again on its own
-        // thread, but an exception there has nowhere to go: it would be swallowed and the
-        // admin told a run had started when it had not — or worse, handed the previous
-        // run's record as if it were this one's.
-        if (admin.running()) throw UseCaseViolation("A sync is already running")
+        requireNotRunning()
         sync.requireScopeChosen()
 
         return start(TriggerSource.MANUAL) {
@@ -85,12 +75,16 @@ class AdminSellfoxController(
     }
 
     /**
-     * Dispatches the run and answers with its record.
+     * Refuses a second concurrent run, on the request thread.
      *
-     * A brief wait so the response carries this run rather than the previous one. A
-     * failure past this point is not lost — the runner writes it to the history, which is
-     * where a scheduled run reports too.
+     * The sync checks again on its own thread, but an exception raised there has nowhere
+     * to go: it would be swallowed and the admin told a run had started when it had not.
      */
+    private fun requireNotRunning() {
+        if (admin.running()) throw UseCaseViolation("A sync is already running")
+    }
+
+    /** Dispatches the run, waiting just long enough that the response carries this run. */
     private fun start(
         trigger: TriggerSource,
         run: (TriggerSource) -> SellfoxSyncRun,
@@ -115,4 +109,3 @@ data class ScopeRequest(
     val cids: Set<String> = emptySet(),
     val warehouseIds: Set<Long> = emptySet(),
 )
-
