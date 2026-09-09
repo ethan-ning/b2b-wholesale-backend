@@ -16,9 +16,9 @@ depend on `b2b-infrastructure`.
 | `b2b-types` | Domain Primitives: `Money`, `SpuCode`, `SkuCode`, `PackQuantity`, `VariantAxis`, `TierId`, `Quantity` | nothing |
 | `b2b-domain` | Entities and aggregates (`Product`, `ProductVariant`, `Customer`), domain services (`PricingPolicy`), and the port interfaces the domain owns | `b2b-types` |
 | `b2b-application` | Use-case orchestration (`CatalogQueryService`), DTOs, assemblers | `b2b-domain` |
-| `b2b-infrastructure` | JPA Data Objects, Spring Data DAOs, converters, port implementations, ACL adapters | `b2b-domain` |
+| `b2b-infrastructure` | JPA Data Objects, Spring Data DAOs, converters, port implementations, ACL adapters, **Flyway migrations** | `b2b-domain` |
 | `b2b-web` | Controllers, request/response adaptation | `b2b-application` |
-| `b2b-start` | Spring Boot entry point, configuration, Flyway migrations | `b2b-web`, `b2b-infrastructure` |
+| `b2b-start` | Spring Boot entry point and deployment configuration | `b2b-web`, `b2b-infrastructure` |
 
 `b2b-infrastructure` and `b2b-web` never depend on each other. They meet only in
 `b2b-start`, which wires them together.
@@ -138,6 +138,30 @@ docker compose down -v              # discard data, so the next run re-applies e
 Flyway owns the schema and Hibernate runs with `ddl-auto: validate`, so the app refuses to
 start if the mappings and the tables disagree — which makes a successful boot a real check
 that the two are in step.
+
+### Configuration profiles
+
+| File | Holds |
+|---|---|
+| `application.yml` | true everywhere: JPA settings, Flyway location, `spring.profiles.default: local` |
+| `application-local.yml` | defaults matching `compose.yaml`, a dev JWT secret, DEBUG logging |
+| `application-prod.yml` | `${DB_URL}`, `${JWT_SECRET}` and friends with **no fallbacks**, pool sizing, INFO logging, health endpoint only |
+
+A bare `java -jar` is a developer, so `local` is the default profile; production sets
+`SPRING_PROFILES_ACTIVE=prod`.
+
+The prod profile deliberately has no fallback values, so an unset variable cannot quietly
+resolve to a development credential. On its own that fails obscurely — Hikari reports
+`'url' must start with "jdbc"` from deep inside bean creation, which does not say that
+`DB_URL` was never set. `RequiredSettingsCheck`, an `EnvironmentPostProcessor`, therefore
+reports first, before any bean exists:
+
+```
+Cannot start with profile 'prod': required settings are missing.
+  - DB_URL  (binds to spring.datasource.url)
+  - JWT_SECRET  (binds to security.jwt.secret)
+Set them in the environment; the prod profile has no fallbacks by design.
+```
 
 ### The application
 

@@ -8,6 +8,9 @@ plugins {
 dependencies {
     api(project(":b2b-domain"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // The schema lives with the DOs it creates tables for: src/main/resources/db/migration.
+    implementation("org.flywaydb:flyway-core")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
     // BCrypt for the PasswordHasher port, and Nimbus (via the resource server) for JWTs.
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")

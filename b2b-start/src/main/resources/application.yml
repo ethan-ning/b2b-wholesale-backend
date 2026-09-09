@@ -1,30 +1,27 @@
+# Settings that are true in every environment. Anything that varies — credentials,
+# log levels, pool sizes — belongs in a profile, not here.
 spring:
   application:
     name: b2b-wholesale
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/b2b}
-    username: ${DB_USER:b2b}
-    password: ${DB_PASSWORD:b2b}
+  # A bare `java -jar` is a developer running it locally. Production sets
+  # SPRING_PROFILES_ACTIVE=prod explicitly.
+  profiles:
+    default: local
   jpa:
     hibernate:
-      ddl-auto: validate      # Flyway owns the schema; Hibernate only checks it
-    open-in-view: false       # No lazy loading in the web layer — repositories return aggregates
+      ddl-auto: validate    # Flyway owns the schema; Hibernate only checks it
+    open-in-view: false     # no lazy loading in the web layer — repositories return aggregates
     properties:
       hibernate:
         jdbc.time_zone: UTC
   flyway:
     enabled: true
+    # Migrations ship in b2b-infrastructure, beside the DOs whose tables they create.
     locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
 
 security:
   jwt:
-    # Override in every real environment. HS256 needs at least 256 bits of key material.
-    secret: ${JWT_SECRET:change-me-in-every-environment-at-least-32-bytes-long}
     ttl-minutes: ${JWT_TTL_MINUTES:480}
-
-server:
-  port: 8080
-
-logging:
-  level:
-    com.acme.b2b: DEBUG

@@ -1,0 +1,4 @@
+# EnvironmentPostProcessors run before the context is built, which is the only place a
+# missing setting can be reported before Hikari fails on it obscurely.
+org.springframework.boot.env.EnvironmentPostProcessor=\
+  com.acme.b2b.config.RequiredSettingsCheck

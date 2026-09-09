@@ -1,0 +1,16 @@
+# Local development. Defaults match compose.yaml, so a fresh clone runs with
+# `docker compose up -d` and nothing else.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/b2b}
+    username: ${DB_USER:b2b}
+    password: ${DB_PASSWORD:b2b}
+
+security:
+  jwt:
+    # Fine on a laptop; the prod profile refuses to start without a real one.
+    secret: ${JWT_SECRET:local-development-secret-at-least-32-bytes-long}
+
+logging:
+  level:
+    com.acme.b2b: DEBUG
