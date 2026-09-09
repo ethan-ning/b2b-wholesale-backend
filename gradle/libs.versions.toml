@@ -1,7 +1,7 @@
 # Single source of truth for versions. Modules reference aliases only — no version
 # literals in any build.gradle.kts.
 [versions]
-kotlin = "2.2.0"
+kotlin = "2.4.20"
 springBoot = "3.5.0"
 
 [libraries]

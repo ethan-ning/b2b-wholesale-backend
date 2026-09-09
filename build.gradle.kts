@@ -14,7 +14,7 @@ subprojects {
     repositories { mavenCentral() }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-        jvmToolchain(21)
+        jvmToolchain(25)
         compilerOptions { freeCompilerArgs.add("-Xjsr305=strict") }
     }
 

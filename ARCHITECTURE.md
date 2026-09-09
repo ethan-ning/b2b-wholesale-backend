@@ -102,6 +102,10 @@ Deliberate, in rough priority order:
 
 ## Running it
 
+Java 25. The build pins it via `jvmToolchain(25)`, and the foojay resolver in
+`settings.gradle.kts` downloads it on a machine that does not have it — so the JDK is a
+property of the build, not of whoever is building.
+
 ```bash
 ./gradlew build          # compiles every module, runs tests, enforces the layering
 ./gradlew test           # domain and types tests only — no container needed
@@ -113,3 +117,9 @@ Flyway owns the schema; Hibernate is set to `validate` and never alters it.
 
 Dependency versions live in `gradle/libs.versions.toml`. The Spring Boot BOM is applied
 as a Gradle platform, so no module names a version.
+
+Kotlin is on 2.4.x because earlier versions cap their JVM target below 25 — 2.2 clamps to
+24 while javac targets 25, and the build fails on that mismatch rather than quietly
+producing inconsistent bytecode. Spring Boot 3.5 is not officially certified above Java 24
+but starts and runs on 25 (verified); moving to Boot 4.x is the supported path when
+convenient.
