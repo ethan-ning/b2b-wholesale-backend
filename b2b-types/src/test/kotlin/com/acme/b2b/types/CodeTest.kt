@@ -12,16 +12,22 @@ class CodeTest {
     @Test
     fun `rejects malformed codes at construction`() {
         assertFailsWith<IllegalArgumentException> { SpuCode("") }
-        assertFailsWith<IllegalArgumentException> { SpuCode("pl001-blk") }    // lower case
         assertFailsWith<IllegalArgumentException> { SkuCode(" GL100-BLK") }   // leading space
         assertFailsWith<IllegalArgumentException> { SkuCode("GL100-BLK ") }   // trailing space
+        assertFailsWith<IllegalArgumentException> { SkuCode("GL100-BLK-") }   // trailing dash
+        assertFailsWith<IllegalArgumentException> { SkuCode("GL100\tBLK") }   // control character
     }
 
     @Test
-    fun `accepts the spaces real supplier codes carry`() {
-        // "AX-K210-ZN-4" and "AX-K210-ZN-4 S" are different products at the supplier.
-        // Rejecting the spaced form pushes callers into normalising it, which merges them.
+    fun `accepts the codes suppliers actually use`() {
+        // Every one of these is a live Sellfox SKU. A stricter pattern does not tidy them
+        // up, it drops the product: it cannot be imported at all.
+        //
+        // The space matters most — "AX-K210-ZN-4" and "AX-K210-ZN-4 S" are different
+        // products, so normalising it away merges two things into one.
         assertEquals("AX-K210-ZN-4 S", SkuCode("AX-K210-ZN-4 S").value)
+        assertEquals("NDR-CPH01+RB-QA118-BLACK-24", SkuCode("NDR-CPH01+RB-QA118-BLACK-24").value)
+        assertEquals("MRL1001-5p", SkuCode("MRL1001-5p").value)
         assertEquals("WM7C310J255-QT4 BK", SpuCode("WM7C310J255-QT4 BK").value)
     }
 

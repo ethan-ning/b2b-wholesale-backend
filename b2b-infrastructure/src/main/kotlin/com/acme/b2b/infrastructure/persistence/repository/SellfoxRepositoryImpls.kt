@@ -60,20 +60,29 @@ class SellfoxScopeRepositoryImpl(
         warehouses.saveAll(rows)
     }
 
-    override fun setCategorySelected(cid: String, selected: Boolean) {
-        val row = categories.findById(cid).orElseThrow {
-            NoSuchElementException("No Sellfox category $cid; run a catalog sync to discover it")
+    /**
+     * Sets the selection to exactly these, clearing the rest. Unknown ids are refused
+     * rather than ignored: silently dropping one would report a scope the admin did not
+     * choose, and they would find out from an import that missed a product line.
+     */
+    override fun selectCategories(cids: Set<String>) {
+        val rows = categories.findAll()
+        val known = rows.map { it.cid }.toSet()
+        (cids - known).takeIf { it.isNotEmpty() }?.let {
+            throw NoSuchElementException("No such Sellfox category group: ${it.joinToString()}")
         }
-        row.selected = selected
-        categories.save(row)
+        rows.forEach { it.selected = it.cid in cids }
+        categories.saveAll(rows)
     }
 
-    override fun setWarehouseSelected(warehouseId: Long, selected: Boolean) {
-        val row = warehouses.findById(warehouseId).orElseThrow {
-            NoSuchElementException("No Sellfox warehouse $warehouseId; run an inventory sync to discover it")
+    override fun selectWarehouses(warehouseIds: Set<Long>) {
+        val rows = warehouses.findAll()
+        val known = rows.map { it.warehouseId }.toSet()
+        (warehouseIds - known).takeIf { it.isNotEmpty() }?.let {
+            throw NoSuchElementException("No such Sellfox warehouse: ${it.joinToString()}")
         }
-        row.selected = selected
-        warehouses.save(row)
+        rows.forEach { it.selected = it.warehouseId in warehouseIds }
+        warehouses.saveAll(rows)
     }
 
     private fun SellfoxCategoryDO.toDomain() = SellfoxCategoryScope(

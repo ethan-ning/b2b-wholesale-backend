@@ -1,5 +1,6 @@
 package com.acme.b2b.application.sellfox
 
+import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.catalog.*
 import com.acme.b2b.domain.sellfox.*
 import com.acme.b2b.types.Money
@@ -45,13 +46,43 @@ class SellfoxSyncService(
     private val clock: Clock,
 ) {
 
-    fun sync(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun =
-        runner.run(trigger, triggeredBy) { counts ->
+    fun sync(trigger: TriggerSource, triggeredBy: String? = null): SellfoxSyncRun {
+        requireScopeChosen()
+        return runner.run(trigger, triggeredBy) { counts ->
             val now = clock.instant()
             val catalog = importCatalog(counts, now)
             val inventory = applyStock(counts, now)
             "$catalog $inventory"
         }
+    }
+
+    /**
+     * Refuses a run that would import nothing.
+     *
+     * Both selections are required, not either: a category with no warehouse imports
+     * products that read as out of stock, and a warehouse with no category counts a
+     * catalog that is not there. Neither is a state worth spending two minutes reaching.
+     *
+     * The exception is a first run, when there is nothing to choose from yet — that run
+     * is how the lists get filled, so it is allowed to import nothing on purpose.
+     *
+     * Public because a caller that dispatches the sync to another thread has to ask
+     * *before* dispatching. An exception thrown on that thread has nowhere to go, and the
+     * caller would report a run that never started.
+     */
+    fun requireScopeChosen() {
+        val knownCategories = scope.categories()
+        val knownWarehouses = scope.warehouses()
+        if (knownCategories.isEmpty() && knownWarehouses.isEmpty()) return
+
+        val missing = buildList {
+            if (knownCategories.isNotEmpty() && scope.selectedCategoryIds().isEmpty()) add("a category")
+            if (knownWarehouses.isNotEmpty() && scope.selectedWarehouseIds().isEmpty()) add("a warehouse")
+        }
+        if (missing.isNotEmpty()) {
+            throw UseCaseViolation("Select ${missing.joinToString(" and ")} to sync")
+        }
+    }
 
     // ─── Products ────────────────────────────────────────────────────────
 
@@ -64,23 +95,31 @@ class SellfoxSyncService(
         val selected = scope.selectedCategoryIds()
         if (selected.isEmpty()) {
             counts.skipped(commodities.size)
-            return "Discovered ${scope.categories().size} categories; none selected, so nothing imported."
+            return "Discovered ${scope.categories().size} category groups; none selected, so nothing imported."
         }
 
-        val families = SpuGrouping.group(commodities) { leafCidOf(it.fullCid) in selected }
-        val outcome = families.map { importFamily(it, now) }
+        val families = SpuGrouping.group(commodities) { groupKeyOf(it.fullCid) in selected }
+        val outcome = families.map { it to importFamily(it, now) }
 
-        counts.wrote(outcome.count { it != Outcome.FAILED })
+        counts.wrote(outcome.count { (_, result) -> result != Outcome.FAILED })
         counts.skipped(commodities.size - families.sumOf { it.members.size })
 
-        val created = outcome.count { it == Outcome.CREATED }
-        val updated = outcome.count { it == Outcome.UPDATED }
-        val failed = outcome.count { it == Outcome.FAILED }
+        val created = outcome.count { (_, result) -> result == Outcome.CREATED }
+        val updated = outcome.count { (_, result) -> result == Outcome.UPDATED }
+        val rejected = outcome.filter { (_, result) -> result == Outcome.FAILED }.map { (family, _) -> family.spuCode }
+
         return buildString {
             append("${families.size} products from ${selected.size} categor")
             append(if (selected.size == 1) "y" else "ies")
             append(" ($created new, $updated updated")
-            if (failed > 0) append(", $failed could not be built")
+            if (rejected.isNotEmpty()) {
+                // Named, not just counted. "15 could not be built" tells an admin
+                // something is wrong and nothing about which product line to go and look
+                // at; the codes are the only part that is actionable.
+                append(", ${rejected.size} rejected: ")
+                append(rejected.take(REJECTS_NAMED).joinToString(", "))
+                if (rejected.size > REJECTS_NAMED) append(" and ${rejected.size - REJECTS_NAMED} more")
+            }
             append(").")
         }
     }
@@ -93,18 +132,29 @@ class SellfoxSyncService(
     private fun discoverCategories(commodities: List<SellfoxCommodity>): List<SellfoxCategoryScope> =
         commodities
             .filter { it.fullCid.isNotBlank() }
-            .groupBy { it.fullCid }
-            .map { (fullCid, rows) ->
+            .groupBy { groupKeyOf(it.fullCid) }
+            .map { (key, rows) ->
                 SellfoxCategoryScope(
-                    cid = leafCidOf(fullCid),
-                    fullCid = fullCid,
-                    fullName = rows.first().fullName,
+                    cid = key,
+                    fullCid = key,
+                    fullName = groupNameOf(rows.first().fullName),
+                    // Everything beneath the group, since that is what selecting it takes.
                     commodityCount = rows.size,
                 )
             }
 
-    /** "100010-100020-100030-" identifies its leaf, 100030 — the id an admin selects. */
-    private fun leafCidOf(fullCid: String): String = fullCid.trim('-').substringAfterLast('-')
+    /**
+     * The group a commodity belongs to: the first two levels of its path.
+     * "100010-100020-100030-" groups under "100010-100020". A one-level path is its own
+     * group rather than being dropped — "未分类" has nothing beneath it and still holds
+     * commodities someone may want.
+     */
+    private fun groupKeyOf(fullCid: String): String =
+        fullCid.trim('-').split('-').take(GROUP_DEPTH).joinToString("-")
+
+    /** "供应商甲/重卡配件/轮毂盖" reads as "供应商甲/重卡配件". */
+    private fun groupNameOf(fullName: String): String =
+        fullName.split('/').take(GROUP_DEPTH).joinToString("/")
 
     private fun importFamily(family: SpuGrouping.Family, now: Instant): Outcome {
         val product = try {
@@ -227,5 +277,11 @@ class SellfoxSyncService(
 
     private companion object {
         val GRAMS_PER_KILO: BigDecimal = BigDecimal(1000)
+
+        /** Categories are chosen two levels down — see SellfoxCategoryScope. */
+        const val GROUP_DEPTH = 2
+
+        /** Enough to act on; the run summary is a line, not a report. */
+        const val REJECTS_NAMED = 8
     }
 }

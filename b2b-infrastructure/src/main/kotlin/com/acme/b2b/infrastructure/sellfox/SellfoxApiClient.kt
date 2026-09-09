@@ -50,17 +50,48 @@ class SellfoxApiClient(
      * Sellfox answers HTTP 200 with a non-zero `code` for business failures, so the
      * status line alone never tells you whether a call worked.
      */
-    fun post(path: String, body: Map<String, Any>): JsonNode {
-        val response = send(path, body)
+    fun post(path: String, body: Map<String, Any>): JsonNode = post(path, body, attempt = 1)
+
+    private fun post(path: String, body: Map<String, Any>, attempt: Int): JsonNode {
+        val response = withRetry(path) { send(path, body) }
         val code = response.path("code").asInt(-1)
-        if (code != SUCCESS_CODE) {
-            throw SellfoxApiException(
-                code = code,
-                message = response.path("msg").asText("no message"),
-                path = path,
-            )
+        if (code == SUCCESS_CODE) return response.path("data")
+
+        // The rate limit is the one business failure worth waiting out — it says "later",
+        // not "no". Everything else would fail identically however often it is asked.
+        if (code == RATE_LIMITED_CODE && attempt < MAX_RATE_LIMIT_ATTEMPTS) {
+            log.warn("{} rate limited; waiting {}ms before attempt {}", path, RATE_LIMIT_BACKOFF_MILLIS, attempt + 1)
+            Thread.sleep(RATE_LIMIT_BACKOFF_MILLIS * attempt)
+            return post(path, body, attempt + 1)
         }
-        return response.path("data")
+
+        throw SellfoxApiException(
+            code = code,
+            message = response.path("msg").asText("no message"),
+            path = path,
+        )
+    }
+
+    /**
+     * Retries a transport failure a few times, backing off.
+     *
+     * A catalog run is sixty-odd sequential pages over two minutes, and one dropped
+     * connection two thirds of the way through used to discard all of it. Only network
+     * faults are retried — a signature or credential problem arrives as a business code
+     * and would fail the same way however many times it is asked.
+     */
+    private fun <T> withRetry(path: String, call: () -> T): T {
+        var lastFailure: Exception? = null
+        repeat(MAX_ATTEMPTS) { attempt ->
+            try {
+                return call()
+            } catch (ex: java.io.IOException) {
+                lastFailure = ex
+                log.warn("{} failed on attempt {} of {}: {}", path, attempt + 1, MAX_ATTEMPTS, ex.message)
+                if (attempt < MAX_ATTEMPTS - 1) Thread.sleep(RETRY_BACKOFF_MILLIS * (attempt + 1))
+            }
+        }
+        throw lastFailure!!
     }
 
     /**
@@ -111,10 +142,14 @@ class SellfoxApiClient(
             .build()
 
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() != 200) {
+        // The status line is not where the answer is. A rate limit arrives as HTTP 400
+        // carrying code 40019, so throwing on the status would hide the one business code
+        // that is worth retrying. Anything with a code is handed up for post() to judge.
+        val parsed = runCatching { mapper.readTree(response.body()) }.getOrNull()
+        if (parsed == null || parsed.get("code") == null) {
             throw SellfoxApiException(response.statusCode(), response.body().take(500), path)
         }
-        return mapper.readTree(response.body())
+        return parsed
     }
 
     /**
@@ -158,7 +193,7 @@ class SellfoxApiClient(
             .GET()
             .build()
 
-        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+        val response = withRetry(TOKEN_PATH) { http.send(request, HttpResponse.BodyHandlers.ofString()) }
         val json = mapper.readTree(response.body())
         if (response.statusCode() != 200 || json.path("code").asInt(-1) != SUCCESS_CODE) {
             throw SellfoxApiException(
@@ -193,6 +228,13 @@ class SellfoxApiClient(
         const val SUCCESS_CODE = 0
         const val DEFAULT_PAGE_SIZE = 100
         const val PAGE_DELAY_MILLIS = 1_300L
+        const val MAX_ATTEMPTS = 3
+        const val RETRY_BACKOFF_MILLIS = 2_000L
+        /** Sellfox's "调用超过限制". */
+        const val RATE_LIMITED_CODE = 40019
+        const val RATE_LIMIT_BACKOFF_MILLIS = 10_000L
+        /** Bounded: a persistently limited account should fail the run, not spin in it. */
+        const val MAX_RATE_LIMIT_ATTEMPTS = 4
         const val HMAC_ALGORITHM = "HmacSHA256"
         const val REFRESH_MARGIN_SECONDS = 300L
     }

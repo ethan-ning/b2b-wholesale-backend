@@ -30,13 +30,12 @@ class AdminSellfoxController(
     @GetMapping("/scope")
     fun scope(): SellfoxScopeView = admin.scope()
 
-    @PutMapping("/scope/categories/{cid}")
-    fun selectCategory(@PathVariable cid: String, @RequestBody body: SelectionRequest) =
-        admin.selectCategory(cid, body.selected)
+    /** The complete selection, not a toggle — so clearing is one call, not ninety. */
+    @PutMapping("/scope/categories")
+    fun selectCategories(@RequestBody body: CategorySelection) = admin.selectCategories(body.cids)
 
-    @PutMapping("/scope/warehouses/{warehouseId}")
-    fun selectWarehouse(@PathVariable warehouseId: Long, @RequestBody body: SelectionRequest) =
-        admin.selectWarehouse(warehouseId, body.selected)
+    @PutMapping("/scope/warehouses")
+    fun selectWarehouses(@RequestBody body: WarehouseSelection) = admin.selectWarehouses(body.warehouseIds)
 
     @GetMapping("/runs")
     fun runs(@RequestParam(defaultValue = "25") limit: Int): SyncHistoryResponse =
@@ -51,10 +50,12 @@ class AdminSellfoxController(
     fun trigger(): SellfoxSyncRun {
         val by = currentAdminEmail()
 
-        // Checked here, on the request thread, so a second click gets a 409 it can see.
-        // The runner checks again on its own thread, but by then the exception has
-        // nowhere to go — an admin would be told the run started when it had not.
+        // Both checked here, on the request thread. The sync checks again on its own
+        // thread, but an exception there has nowhere to go: it would be swallowed and the
+        // admin told a run had started when it had not — or worse, handed the previous
+        // run's record as if it were this one's.
         if (admin.running()) throw UseCaseViolation("A sync is already running")
+        sync.requireScopeChosen()
 
         val started = CompletableFuture.supplyAsync { sync.sync(TriggerSource.MANUAL, by) }
 
@@ -77,7 +78,9 @@ class AdminSellfoxController(
     }
 }
 
-data class SelectionRequest(val selected: Boolean)
+data class CategorySelection(val cids: Set<String> = emptySet())
+
+data class WarehouseSelection(val warehouseIds: Set<Long> = emptySet())
 
 data class SyncHistoryResponse(
     val runs: List<SellfoxSyncRun>,

@@ -9,7 +9,7 @@ value class SkuCode(val value: String) {
     init {
         require(value.isNotBlank()) { "SKU code must not be blank" }
         require(value.length <= 80) { "SKU code must be 80 characters or fewer" }
-        require(PATTERN.matches(value)) { "SKU code must be upper-case alphanumerics, dashes and spaces: $value" }
+        require(PATTERN.matches(value)) { "SKU code has characters a supplier code would not: $value" }
     }
 
     /**
@@ -28,10 +28,15 @@ value class SkuCode(val value: String) {
 
     companion object {
         /**
-         * Spaces are allowed inside the code, not at its ends. Supplier SKUs really do
-         * carry them — "AX-K210-ZN-4" and "AX-K210-ZN-4 S" are different products — and
-         * normalising them away silently maps one product onto another.
+         * Alphanumerics at the ends; spaces, dashes, dots and plus signs allowed between.
+         *
+         * The set is what supplier codes actually contain, not what would be tidy. Spaces
+         * distinguish real products ("AX-K210-ZN-4" from "AX-K210-ZN-4 S"). A plus marks
+         * a kit ("NDR-CPH01+RB-QA118-BLACK-24"). Lower case turns up in a handful
+         * ("MRL1001-5p"). Every character rejected here is a product that cannot be
+         * imported at all, and codes are stored and matched verbatim, so admitting them
+         * costs nothing — nothing normalises case or strips anything.
          */
-        private val PATTERN = Regex("^[A-Z0-9]+([A-Z0-9 -]*[A-Z0-9])?$")
+        private val PATTERN = Regex("^[A-Za-z0-9]+([A-Za-z0-9 .+_/-]*[A-Za-z0-9])?$")
     }
 }

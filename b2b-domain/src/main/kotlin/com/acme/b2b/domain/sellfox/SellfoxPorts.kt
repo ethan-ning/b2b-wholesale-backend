@@ -34,14 +34,28 @@ interface SellfoxScopeRepository {
     fun refreshCategories(seen: List<SellfoxCategoryScope>, at: Instant)
     fun refreshWarehouses(seen: List<SellfoxWarehouse>, at: Instant)
 
-    fun setCategorySelected(cid: String, selected: Boolean)
-    fun setWarehouseSelected(warehouseId: Long, selected: Boolean)
+    /**
+     * Replaces the whole selection rather than toggling one row. Clearing is then the
+     * same operation as choosing, instead of a loop of ninety calls, and two admins
+     * editing at once cannot interleave into a selection neither of them made.
+     */
+    fun selectCategories(cids: Set<String>)
+    fun selectWarehouses(warehouseIds: Set<Long>)
 }
 
+/**
+ * A second-level category group — "供应商甲/重卡配件" — and everything beneath it.
+ *
+ * The leaves are the wrong unit to choose from: ninety of them, most holding a handful
+ * of SKUs, and picking one product line would mean ticking a dozen boxes.
+ */
 data class SellfoxCategoryScope(
+    /** First two segments of the path's ids, joined by "-". */
     val cid: String,
     val fullCid: String,
+    /** First two segments of the path's names. */
     val fullName: String,
+    /** Commodities anywhere beneath this group, not just directly in it. */
     val commodityCount: Int,
     val selected: Boolean = false,
     val lastSeenAt: Instant? = null,

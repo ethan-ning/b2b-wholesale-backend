@@ -28,11 +28,10 @@ class SellfoxAdminService(
     fun running(): Boolean = runs.isRunning()
 
     @Transactional
-    fun selectCategory(cid: String, selected: Boolean) = scope.setCategorySelected(cid, selected)
+    fun selectCategories(cids: Set<String>) = scope.selectCategories(cids)
 
     @Transactional
-    fun selectWarehouse(warehouseId: Long, selected: Boolean) =
-        scope.setWarehouseSelected(warehouseId, selected)
+    fun selectWarehouses(warehouseIds: Set<Long>) = scope.selectWarehouses(warehouseIds)
 
     private companion object {
         const val MAX_HISTORY = 200

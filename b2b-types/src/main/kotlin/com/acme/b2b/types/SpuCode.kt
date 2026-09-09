@@ -16,6 +16,6 @@ value class SpuCode(val value: String) {
 
     companion object {
         /** Same shape as a SKU code — an SPU is derived from the SKUs beneath it. */
-        private val PATTERN = Regex("^[A-Z0-9]+([A-Z0-9 -]*[A-Z0-9])?$")
+        private val PATTERN = Regex("^[A-Za-z0-9]+([A-Za-z0-9 .+_/-]*[A-Za-z0-9])?$")
     }
 }
