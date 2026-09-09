@@ -102,13 +102,12 @@ Deliberate, in rough priority order:
 
 ## Running it
 
-Java 21. The build pins it via `jvmToolchain(21)`, and the foojay resolver in
-`settings.gradle.kts` downloads it on a machine that does not have it — so the JDK is a
-property of the build, not of whoever is building.
+Java 21, declared once as `java` in the version catalog and fed to `jvmToolchain()`.
 
 The toolchain governs compilation, `test` and `bootRun`, so the whole development loop
-runs on 21 regardless of the machine's default JDK. Only a bare `java -jar` on the
-built artifact uses whatever `JAVA_HOME` points at; the bytecode is Java 21 either way.
+runs on 21 regardless of the machine's default JDK — and a JDK 21 must be installed, or
+Gradle will say so. Only a bare `java -jar` on the built artifact uses whatever
+`JAVA_HOME` points at; the bytecode is Java 21 either way.
 
 ```bash
 ./gradlew build          # compiles every module, runs tests, enforces the layering
@@ -124,35 +123,26 @@ as a Gradle platform, so no module names a version.
 
 ### Where versions live
 
-Three files, because Gradle insists on a specific home for two of them — the wrapper
-bootstraps before any build script runs, and the daemon's JVM is chosen before that, so
-neither can read the version catalog.
+`gradle/libs.versions.toml` declares everything: `java`, `gradle`, `kotlin`,
+`springBoot`, and every library and plugin. `java` feeds `jvmToolchain()` directly, so
+that one line determines the bytecode.
 
-| File | Holds | Regenerate with |
-|---|---|---|
-| `gradle/libs.versions.toml` | Declared `java`, `gradle`, `kotlin`, `springBoot`, and every library and plugin | edit directly |
-| `gradle/gradle-daemon-jvm.properties` | The JVM the Gradle daemon runs on | `./gradlew updateDaemonJvm --jvm-version=21` |
-| `gradle/wrapper/gradle-wrapper.properties` | Gradle itself | `./gradlew wrapper --gradle-version 9.7.1` |
-
-The catalog is the **declared** source of truth; the other two are generated artifacts of
-it. `checkVersionConsistency` — wired into `check`, so `./gradlew build` runs it — fails
-if either drifts, naming the command that fixes it:
+The single exception is Gradle itself, which must live in
+`gradle/wrapper/gradle-wrapper.properties` — the wrapper bootstraps before any build
+script runs, so it cannot read the catalog. `checkVersionConsistency`, wired into
+`check`, compares the two and fails naming the fix:
 
 ```
-Version drift:
-  - daemon JVM is 21 but libs.versions.toml declares java = "22"; run: ./gradlew updateDaemonJvm --jvm-version=22
+Wrapper is Gradle 9.7.1 but libs.versions.toml declares gradle = "9.9.9"; run: ./gradlew wrapper --gradle-version 9.9.9
 ```
 
-Because the daemon JVM is pinned by criteria rather than by `JAVA_HOME`, the build runs on
-Java 21 whatever the machine's default JDK is — `gradle-daemon-jvm.properties` carries
-per-platform download URLs, so a machine with no JDK 21 fetches one. Once the daemon is on
-21, its own JVM satisfies the compile toolchain.
-
-The `foojay-resolver-convention` plugin in `settings.gradle.kts` is therefore **not** used
-by ordinary builds — verified by removing it and building with local JDK detection
-disabled. It exists solely so `updateDaemonJvm` can resolve those download URLs when the
-Java version changes; without it that task fails with "Toolchain download repositories
-have not been configured".
+An earlier draft also pinned the JVM the Gradle daemon runs on, via
+`gradle-daemon-jvm.properties` and the foojay toolchain resolver. That was removed: the
+daemon's JVM does not affect the bytecode — `jvmToolchain` already guarantees that — so
+it bought only that the build *process* ran on a known JVM, at the cost of a plugin, a
+generated file of baked download URLs, and half of the drift check. If a machine's
+default JDK is ever incompatible with our Gradle version, Gradle says so and `JAVA_HOME`
+is the fix.
 
 ### Why these versions
 
