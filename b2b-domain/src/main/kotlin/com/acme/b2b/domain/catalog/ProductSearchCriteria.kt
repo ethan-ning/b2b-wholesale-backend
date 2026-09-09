@@ -16,7 +16,10 @@ data class ProductSearchCriteria(
     val priceMin: Money? = null,
     val priceMax: Money? = null,
     val sort: ProductSort = ProductSort.RELEVANCE,
+    /** Dealers see only ACTIVE products; an admin browses drafts and archived ones too. */
     val onlyPublished: Boolean = true,
+    /** Narrows to one status. Only meaningful when [onlyPublished] is false. */
+    val status: ProductStatus? = null,
 )
 
 enum class ProductSort { RELEVANCE, PRICE_ASC, PRICE_DESC, NAME_ASC }

@@ -29,6 +29,39 @@ interface ProductJpaRepository : JpaRepository<ProductDO, Long> {
         @Param("text") text: String?,
         @Param("status") status: String?,
     ): List<ProductDO>
+
+    fun countByStatus(status: String): Long
+}
+
+/**
+ * The stock read side. Projects straight to a row rather than loading ProductDO graphs —
+ * the admin's stock screen is a flat list across every SKU, and hydrating aggregates to
+ * render it would be slower and a misuse of the aggregate.
+ */
+interface ProductVariantJpaRepository : JpaRepository<ProductVariantDO, Long> {
+
+    @Query(
+        """
+        SELECT v FROM ProductVariantDO v
+        JOIN v.product p
+        WHERE (:text IS NULL
+               OR LOWER(v.sku) LIKE :text
+               OR LOWER(p.name) LIKE :text
+               OR LOWER(p.spuCode) LIKE :text)
+          AND (:lowStockOnly = FALSE
+               OR (v.availableStock > 0 AND v.availableStock < :threshold))
+        ORDER BY p.spuCode, v.sortOrder
+        """
+    )
+    fun searchStock(
+        @Param("text") text: String?,
+        @Param("lowStockOnly") lowStockOnly: Boolean,
+        @Param("threshold") threshold: Int,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<ProductVariantDO>
+
+    fun countByAvailableStockGreaterThanAndAvailableStockLessThan(floor: Int, ceiling: Int): Long
+    fun countByAvailableStock(availableStock: Int): Long
 }
 
 interface TierPriceJpaRepository : JpaRepository<TierPriceDO, Long> {
@@ -37,10 +70,14 @@ interface TierPriceJpaRepository : JpaRepository<TierPriceDO, Long> {
     fun deleteBySku(sku: String)
 }
 
-interface CategoryJpaRepository : JpaRepository<CategoryDO, Long>
+interface CategoryJpaRepository : JpaRepository<CategoryDO, Long> {
+    fun existsByParentId(parentId: Long): Boolean
+    fun existsBySlug(slug: String): Boolean
+}
 
 interface ProductCategoryJpaRepository : JpaRepository<ProductCategoryDO, Long> {
     fun findByCategoryIdIn(categoryIds: Collection<Long>): List<ProductCategoryDO>
+    fun existsByCategoryId(categoryId: Long): Boolean
 }
 
 interface CustomerTierJpaRepository : JpaRepository<CustomerTierDO, Long>
@@ -53,6 +90,7 @@ interface CustomerJpaRepository : JpaRepository<CustomerDO, Long> {
     fun findByEmail(email: String): CustomerDO?
     fun existsByEmail(email: String): Boolean
     fun existsByTierId(tierId: Long): Boolean
+    fun countByStatus(status: String): Long
 
     @Query(
         """

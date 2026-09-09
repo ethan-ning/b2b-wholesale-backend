@@ -58,6 +58,10 @@ class CustomerRepositoryImpl(
     }
 
     override fun anyOnTier(tierId: TierId): Boolean = jpa.existsByTierId(tierId.value)
+
+    override fun countAll(): Long = jpa.count()
+
+    override fun countByStatus(status: CustomerStatus): Long = jpa.countByStatus(status.name)
 }
 
 @Repository

@@ -1,7 +1,11 @@
 package com.acme.b2b.web.security
 
 import com.acme.b2b.application.admin.AdminAuthService
+import com.acme.b2b.application.admin.CategoryAdminService
 import com.acme.b2b.application.admin.CustomerAdminService
+import com.acme.b2b.application.admin.DashboardService
+import com.acme.b2b.application.admin.InventoryQueryService
+import com.acme.b2b.application.admin.ProductAdminService
 import com.acme.b2b.application.admin.dto.AdminLoginResponse
 import com.acme.b2b.application.admin.dto.AdminUserDTO
 import com.acme.b2b.application.catalog.CatalogQueryService
@@ -58,8 +62,16 @@ class AdminApiSecurityTest {
     @MockitoBean private lateinit var adminAuth: AdminAuthService
     @MockitoBean private lateinit var customers: CustomerAdminService
 
-    /** Not exercised here, but the whole routing table loads, so it must be satisfiable. */
+    /**
+     * Not exercised here, but the whole routing table loads, so every controller's
+     * dependencies must be satisfiable. That is deliberate: a controller added without a
+     * matching rule fails this test rather than shipping unprotected.
+     */
     @MockitoBean private lateinit var catalog: CatalogQueryService
+    @MockitoBean private lateinit var productAdmin: ProductAdminService
+    @MockitoBean private lateinit var categoryAdmin: CategoryAdminService
+    @MockitoBean private lateinit var inventoryQuery: InventoryQueryService
+    @MockitoBean private lateinit var dashboard: DashboardService
 
     private val adminToken = token(scope = "ADMIN", secret = SECRET)
     private val dealerToken = token(scope = "DEALER", secret = SECRET)
@@ -97,6 +109,24 @@ class AdminApiSecurityTest {
 
         mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $adminToken"))
             .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `every admin route is closed to a dealer, not only the ones with a test`() {
+        // Enumerated rather than spot-checked: the rule is on /api/admin/**, so a route
+        // added later is covered by adding one line here, not by remembering to.
+        listOf(
+            "/api/admin/customers",
+            "/api/admin/tiers",
+            "/api/admin/dashboard",
+            "/api/admin/products",
+            "/api/admin/categories",
+            "/api/admin/inventory",
+        ).forEach { path ->
+            mockMvc.perform(get(path).header("Authorization", "Bearer $dealerToken"))
+                .andExpect(status().isForbidden)
+            mockMvc.perform(get(path)).andExpect(status().isUnauthorized)
+        }
     }
 
     @Test

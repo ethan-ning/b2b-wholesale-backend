@@ -4,12 +4,26 @@ import com.acme.b2b.domain.catalog.Category
 import com.acme.b2b.domain.catalog.CategoryRepository
 import com.acme.b2b.infrastructure.persistence.entity.CategoryDO
 import com.acme.b2b.infrastructure.persistence.jpa.CategoryJpaRepository
+import com.acme.b2b.infrastructure.persistence.jpa.ProductCategoryJpaRepository
 import org.springframework.stereotype.Repository
 
 @Repository
 class CategoryRepositoryImpl(
     private val jpa: CategoryJpaRepository,
+    private val productCategories: ProductCategoryJpaRepository,
 ) : CategoryRepository {
+
+    override fun findById(id: Long): Category? =
+        jpa.findById(id).orElse(null)?.let {
+            Category(it.id, it.name, it.slug, it.parentId, it.sortOrder)
+        }
+
+    override fun hasChildren(categoryId: Long): Boolean = jpa.existsByParentId(categoryId)
+
+    override fun isAssignedToProducts(categoryId: Long): Boolean =
+        productCategories.existsByCategoryId(categoryId)
+
+    override fun existsBySlug(slug: String): Boolean = jpa.existsBySlug(slug)
 
     override fun findTree(): List<Category> {
         val all = jpa.findAll()

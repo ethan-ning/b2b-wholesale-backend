@@ -105,6 +105,31 @@ Carried over from the frontend's design work — see the portal repo's
   `ProductDataConverter.applyTo` deliberately does not write stock columns, so saving a
   product cannot undo a sync.
 
+## Admin portal surface
+
+| Route | Notes |
+|---|---|
+| `POST /api/admin/auth/login` | BCrypt verify, HS256 token with `scope: ADMIN` |
+| `GET /api/admin/dashboard` | counting queries only, so it does not slow as the catalog grows |
+| `GET/PUT/DELETE /api/admin/products` | portal-owned fields only; no create — products arrive from the ERP |
+| `GET/POST/PUT/DELETE /api/admin/categories` | our taxonomy; delete refuses rather than cascades |
+| `GET /api/admin/inventory` | read-only; the ERP owns stock |
+| `GET/POST/PUT /api/admin/customers`, `POST .../reset-password`, `GET /api/admin/tiers` | dealer accounts |
+
+Two rules the code enforces structurally rather than by review:
+
+- **`UpdateProductCommand` has no field for name, brand, description, SPU code or variant
+  axis.** ERP-owned values cannot be written because there is nowhere to put them, not
+  because a check rejects them.
+- **Category delete refuses when the node has children or products**, rather than
+  cascading. A cascade would unfile products invisibly from the button the admin pressed.
+
+### Local sample data
+
+`db/seed/V900__local_sample_catalog.sql` ships in `b2b-infrastructure` but only applies
+when `application-local.yml` adds `classpath:db/seed` to `spring.flyway.locations`.
+Production never lists that location, so the seed cannot reach it.
+
 ## Known gaps
 
 Deliberate, in rough priority order:

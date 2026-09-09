@@ -13,6 +13,9 @@ interface CustomerRepository {
     fun save(customer: Customer): Customer
     /** True when any dealer is on this tier — a tier in use must not be deleted. */
     fun anyOnTier(tierId: TierId): Boolean
+
+    fun countAll(): Long
+    fun countByStatus(status: CustomerStatus): Long
 }
 
 interface CustomerTierRepository {

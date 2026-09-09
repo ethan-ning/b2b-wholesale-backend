@@ -30,6 +30,10 @@ class TierPriceRepositoryImpl(
     override fun replaceFor(sku: SkuCode, rows: List<TierPrice>) {
         require(rows.all { it.sku == sku }) { "All rows must belong to $sku" }
         jpa.deleteBySku(sku.value)
+        // Force the delete out before the inserts. Without this both sit in the same
+        // flush and Hibernate may order the insert first, breaching
+        // (sku, tier_id, min_qty) when a row is being replaced with the same key.
+        jpa.flush()
         jpa.saveAll(
             rows.map {
                 TierPriceDO(

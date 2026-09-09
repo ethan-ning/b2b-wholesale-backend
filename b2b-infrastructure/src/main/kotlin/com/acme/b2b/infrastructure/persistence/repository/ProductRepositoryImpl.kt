@@ -30,12 +30,23 @@ class ProductRepositoryImpl(
     private val categories: CategoryRepository,
 ) : ProductRepository {
 
+    override fun findById(id: Long): Product? =
+        jpa.findById(id).orElse(null)?.let { converter.toDomain(it) }
+
     override fun findBySpuCode(spuCode: SpuCode): Product? =
         jpa.findBySpuCode(spuCode.value)?.let { converter.toDomain(it) }
 
+    override fun countAll(): Long = jpa.count()
+
+    override fun countByStatus(status: ProductStatus): Long = jpa.countByStatus(status.name)
+
     override fun search(criteria: ProductSearchCriteria, page: Page): PageOf<Product> {
         val text = criteria.text?.lowercase()?.let { "%$it%" }
-        val status = if (criteria.onlyPublished) ProductStatus.ACTIVE.name else null
+        // A dealer sees only ACTIVE; an admin may narrow to one status or see them all.
+        val status = when {
+            criteria.onlyPublished -> ProductStatus.ACTIVE.name
+            else -> criteria.status?.name
+        }
 
         var found = jpa.search(text, status).map { converter.toDomain(it) }
 
@@ -61,15 +72,23 @@ class ProductRepositoryImpl(
 
         converter.applyTo(row, product)
 
-        row.categories.clear()
+        // Reconcile rather than clear-and-re-add: Hibernate is free to order the inserts
+        // before the deletes within one flush, which trips the (product_id, category_id)
+        // unique key when a category is being kept.
+        row.categories.removeIf { it.categoryId !in product.categoryIds }
         product.categoryIds.forEach { categoryId ->
-            row.categories.add(
-                ProductCategoryDO(
-                    product = row,
-                    categoryId = categoryId,
-                    isPrimary = categoryId == product.primaryCategoryId,
+            val existingLink = row.categories.firstOrNull { it.categoryId == categoryId }
+            if (existingLink == null) {
+                row.categories.add(
+                    ProductCategoryDO(
+                        product = row,
+                        categoryId = categoryId,
+                        isPrimary = categoryId == product.primaryCategoryId,
+                    )
                 )
-            )
+            } else {
+                existingLink.isPrimary = categoryId == product.primaryCategoryId
+            }
         }
         return converter.toDomain(jpa.save(row))
     }

@@ -5,6 +5,11 @@
 #   SPRING_PROFILES_ACTIVE=local java -jar ...
 #   ./gradlew :b2b-start:bootRun     (sets the profile for you)
 spring:
+  flyway:
+    # Adds a sample catalog on top of the real migrations. Production never lists this
+    # location, so the seed cannot reach it.
+    locations: classpath:db/migration,classpath:db/seed
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/b2b}
     username: ${DB_USER:b2b}

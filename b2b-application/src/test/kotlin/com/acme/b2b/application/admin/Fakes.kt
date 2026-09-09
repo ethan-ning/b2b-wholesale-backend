@@ -29,6 +29,8 @@ class InMemoryCustomerRepository(seed: List<Customer> = emptyList()) : CustomerR
     override fun findByEmail(email: Email) = rows.values.firstOrNull { it.email == email }
     override fun existsByEmail(email: Email) = findByEmail(email) != null
     override fun anyOnTier(tierId: TierId) = rows.values.any { it.tierId == tierId }
+    override fun countAll() = rows.size.toLong()
+    override fun countByStatus(status: CustomerStatus) = rows.values.count { it.status == status }.toLong()
 
     override fun search(criteria: CustomerSearchCriteria, page: Page): PageOf<Customer> {
         val text = criteria.text?.lowercase()
