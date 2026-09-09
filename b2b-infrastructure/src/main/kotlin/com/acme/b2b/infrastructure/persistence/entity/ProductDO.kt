@@ -42,7 +42,7 @@ class ProductDO(
     var attributesJson: String? = null,
 
     @Column(nullable = false)
-    var status: String = "ACTIVE",
+    var visibility: String = "HIDDEN",
 
     /** PORTAL or SELLFOX — where this row's identity comes from. */
     @Column(nullable = false)

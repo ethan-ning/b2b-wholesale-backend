@@ -53,8 +53,11 @@ data class RegroupOutcome(
     val productsCreated: Int,
     val skusCreated: Int,
     val skusMoved: Int,
+    /** SKUs the supplier no longer sells, marked discontinued rather than deleted. */
+    val skusWithdrawn: Int,
     val emptyProductsRemoved: Int,
 ) {
     val changed: Boolean
-        get() = productsCreated > 0 || skusCreated > 0 || skusMoved > 0 || emptyProductsRemoved > 0
+        get() = productsCreated > 0 || skusCreated > 0 || skusMoved > 0 ||
+            skusWithdrawn > 0 || emptyProductsRemoved > 0
 }

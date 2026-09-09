@@ -22,5 +22,5 @@ interface ProductRepository {
     fun save(product: Product): Product
 
     fun countAll(): Long
-    fun countByStatus(status: ProductStatus): Long
+    fun countByVisibility(visibility: ProductVisibility): Long
 }

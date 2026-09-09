@@ -1,7 +1,7 @@
 package com.acme.b2b.infrastructure.persistence.repository
 
 import com.acme.b2b.domain.catalog.ProductGroupingRepository
-import com.acme.b2b.domain.catalog.ProductStatus
+import com.acme.b2b.domain.catalog.ProductVisibility
 import com.acme.b2b.domain.catalog.ProductStockRepository
 import com.acme.b2b.domain.catalog.RegroupOutcome
 import com.acme.b2b.domain.catalog.RegroupedFamily
@@ -103,6 +103,19 @@ class ProductGroupingRepositoryImpl(
         // Flushed before looking for empties: the rows that left are still pending, so a
         // product would otherwise look occupied by SKUs it has lost.
         variants.flush()
+
+        // A SKU in no family is one the last import did not see — the supplier stopped
+        // selling it, or its category left the scope. Marked rather than deleted, because
+        // its tier prices hang off it and a SKU coming back on sale should find its
+        // pricing intact. Nothing else clears these, so without this a withdrawn SKU
+        // would stay on the shelf indefinitely.
+        val placed = families.flatMap { family -> family.members.map { it.sku } }.toSet()
+        val withdrawn = variants
+            .findByProductSourceAndStatus(SELLFOX, ACTIVE)
+            .filterNot { it.sku in placed }
+        withdrawn.forEach { it.status = DISCONTINUED }
+        variants.saveAll(withdrawn)
+
         val emptied = products.findBySourceIn(listOf(SELLFOX)).filter { it.variants.isEmpty() }
         products.deleteAll(emptied)
 
@@ -110,16 +123,17 @@ class ProductGroupingRepositoryImpl(
             productsCreated = productsCreated,
             skusCreated = skusCreated,
             skusMoved = skusMoved,
+            skusWithdrawn = withdrawn.size,
             emptyProductsRemoved = emptied.size,
         )
     }
 
     override fun deactivateProductsNotIn(spuCodes: Set<String>): Int {
         val stale = products
-            .findBySourceAndStatus(SELLFOX, ProductStatus.ACTIVE.name)
+            .findBySourceAndVisibility(SELLFOX, ProductVisibility.VISIBLE.name)
             .filterNot { it.spuCode in spuCodes }
         stale.forEach {
-            it.status = ProductStatus.INACTIVE.name
+            it.visibility = ProductVisibility.HIDDEN.name
             it.updatedAt = Instant.now()
         }
         products.saveAll(stale)
@@ -135,7 +149,7 @@ class ProductGroupingRepositoryImpl(
             spuCode = family.spuCode,
             name = family.name,
             source = SELLFOX,
-            status = ProductStatus.INACTIVE.name,
+            visibility = ProductVisibility.HIDDEN.name,
             variantAxis = family.axis?.label,
             createdAt = Instant.now(),
             updatedAt = Instant.now(),
@@ -155,5 +169,6 @@ class ProductGroupingRepositoryImpl(
     private companion object {
         const val SELLFOX = "SELLFOX"
         const val ACTIVE = "ACTIVE"
+        const val DISCONTINUED = "DISCONTINUED"
     }
 }

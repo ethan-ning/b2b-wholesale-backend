@@ -26,8 +26,7 @@ CREATE INDEX idx_category_parent ON category (parent_id);
 -- ─── Catalog ─────────────────────────────────────────────────────────────
 --
 -- A product is a style or colour; its SKUs vary along one axis, size for apparel and pack
--- quantity for parts. Two statuses, not three: products arrive from the ERP already real
--- so nothing is ever draft, and "archived" would be a second name for inactive.
+-- quantity for parts.
 CREATE TABLE product (
     id                    BIGSERIAL PRIMARY KEY,
     spu_code              TEXT NOT NULL UNIQUE,
@@ -40,8 +39,13 @@ CREATE TABLE product (
     variant_axis          TEXT,
     -- Display-only key/value bag. Seeded from the ERP at import, ours afterwards.
     attributes_json       TEXT,
-    status                TEXT NOT NULL DEFAULT 'ACTIVE'
-                              CHECK (status IN ('ACTIVE', 'INACTIVE')),
+    -- The portal's only lever over a product. Not "active": the ERP already uses that
+    -- word for 在售, and only 在售 commodities are imported at all, so a product that
+    -- stops being on sale leaves by not being imported rather than by this flag.
+    -- Defaults to hidden — an import has no dealer price yet, and an unpriced product
+    -- would be offered at base price, which for an import is zero.
+    visibility            TEXT NOT NULL DEFAULT 'HIDDEN'
+                              CHECK (visibility IN ('VISIBLE', 'HIDDEN')),
     -- Where this row's identity comes from. A sync never touches a PORTAL row, and the
     -- admin form reads this to decide which fields render read-only.
     source                TEXT NOT NULL DEFAULT 'PORTAL'
@@ -49,7 +53,7 @@ CREATE TABLE product (
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_product_status ON product (status);
+CREATE INDEX idx_product_visibility ON product (visibility);
 CREATE INDEX idx_product_source ON product (source);
 CREATE INDEX idx_product_name ON product (LOWER(name));
 
@@ -69,6 +73,9 @@ CREATE TABLE product_variant (
     map_price        NUMERIC(10, 2),
     upc              VARCHAR(14),
     weight           NUMERIC(8, 3),
+    -- Whether the supplier still sells this SKU. Set by a sync, never by the portal: a
+    -- SKU that stops being 在售 is no longer imported, and this is what records that
+    -- rather than leaving it on the shelf.
     status           TEXT NOT NULL DEFAULT 'ACTIVE'
                          CHECK (status IN ('ACTIVE', 'DISCONTINUED')),
     -- Owned by the ERP. No portal path writes these.

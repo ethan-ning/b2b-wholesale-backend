@@ -29,14 +29,14 @@ class AdminCatalogController(
     @GetMapping("/products")
     fun listProducts(
         @RequestParam(required = false) search: String?,
-        @RequestParam(required = false) status: String?,
+        @RequestParam(required = false) visibility: String?,
         /** spuCode (default), name, brand or price; direction asc or desc. */
         @RequestParam(required = false) sort: String?,
         @RequestParam(required = false) direction: String?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): PagedDTO<ProductDTO> =
-        products.list(AdminProductQuery(search, status, sort, direction, page, size))
+        products.list(AdminProductQuery(search, visibility, sort, direction, page, size))
 
     @GetMapping("/products/{id}")
     fun productById(@PathVariable id: Long): ResponseEntity<AdminProductDTO> =

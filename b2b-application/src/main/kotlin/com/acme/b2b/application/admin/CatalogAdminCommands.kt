@@ -10,7 +10,7 @@ import java.math.BigDecimal
 data class UpdateProductCommand(
     val baseWholesalePrice: BigDecimal,
     val locationCode: String?,
-    val status: String,
+    val visibility: String,
     val attributes: Map<String, String> = emptyMap(),
     val imageUrls: List<String> = emptyList(),
     val categoryIds: List<Long> = emptyList(),
@@ -29,7 +29,7 @@ data class TierPriceEntry(
 
 data class AdminProductQuery(
     val search: String? = null,
-    val status: String? = null,
+    val visibility: String? = null,
     /** spuCode (default), name, brand or price. */
     val sort: String? = null,
     val direction: String? = null,

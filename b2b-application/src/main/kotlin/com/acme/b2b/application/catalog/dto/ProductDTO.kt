@@ -19,7 +19,8 @@ data class ProductDTO(
     /** "Size" or "Pack Qty" — titles the variant column. */
     val variantAxis: String?,
     val attributes: Map<String, String>,
-    val status: String,
+    /** VISIBLE or HIDDEN — the portal's only lever. Not the ERP's on-sale state. */
+    val visibility: String,
     /**
      * False when some SKU has no tier price. Such a product cannot be activated: it would
      * be offered at its base price, which for an ERP import is zero. Null on the

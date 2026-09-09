@@ -16,10 +16,10 @@ data class ProductSearchCriteria(
     val priceMin: Money? = null,
     val priceMax: Money? = null,
     val sort: ProductSort = ProductSort.DEFAULT,
-    /** Dealers see only ACTIVE products; an admin browses drafts and archived ones too. */
-    val onlyPublished: Boolean = true,
-    /** Narrows to one status. Only meaningful when [onlyPublished] is false. */
-    val status: ProductStatus? = null,
+    /** Dealers see only visible products; an admin sees hidden ones too. */
+    val onlyVisible: Boolean = true,
+    /** Narrows to one visibility. Only meaningful when [onlyVisible] is false. */
+    val visibility: ProductVisibility? = null,
 )
 
 /**

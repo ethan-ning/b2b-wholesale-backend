@@ -39,8 +39,8 @@ class ProductAdminService(
         val criteria = ProductSearchCriteria(
             text = query.search?.takeIf { it.isNotBlank() },
             // An admin sees drafts and archived products; a dealer never does.
-            onlyPublished = false,
-            status = query.status?.takeIf { it.isNotBlank() }?.let { parseStatus(it) },
+            onlyVisible = false,
+            visibility = query.visibility?.takeIf { it.isNotBlank() }?.let { parseVisibility(it) },
             sort = SortParser.parse(query.sort, query.direction),
         )
         val page = products.search(criteria, Page(query.page, query.size))
@@ -92,7 +92,7 @@ class ProductAdminService(
             baseWholesalePrice = Money.of(command.baseWholesalePrice),
             locationCode = command.locationCode,
             attributes = command.attributes,
-            status = parseStatus(command.status),
+            visibility = parseVisibility(command.visibility),
             categoryIds = command.categoryIds,
             primaryCategoryId = command.primaryCategoryId,
             imageUrls = command.imageUrls,
@@ -117,8 +117,8 @@ class ProductAdminService(
         val existing = products.findById(id)
             ?: throw NoSuchElementException("No product with id $id")
 
-        val status = if (active) ProductStatus.ACTIVE else ProductStatus.INACTIVE
-        if (existing.status == status) {
+        val visibility = if (active) ProductVisibility.VISIBLE else ProductVisibility.HIDDEN
+        if (existing.visibility == visibility) {
             return AdminProductDTO(toDto(existing, categoryNames()), priceBookOf(existing))
         }
 
@@ -127,11 +127,11 @@ class ProductAdminService(
         // is zero — the one mistake this flag can make that costs money.
         if (active && !existing.isSellable(pricedSkusOf(existing))) {
             throw UseCaseViolation(
-                "Set tier pricing for every SKU of ${existing.spuCode} before activating it"
+                "Set tier pricing for every SKU of ${existing.spuCode} before showing it to dealers"
             )
         }
 
-        val saved = products.save(existing.withStatus(status))
+        val saved = products.save(existing.withVisibility(visibility))
         return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
     }
 
@@ -227,8 +227,8 @@ class ProductAdminService(
         return flat
     }
 
-    private fun parseStatus(raw: String): ProductStatus =
-        runCatching { ProductStatus.valueOf(raw.uppercase()) }
+    private fun parseVisibility(raw: String): ProductVisibility =
+        runCatching { ProductVisibility.valueOf(raw.uppercase()) }
             .getOrElse { throw UseCaseViolation("Unknown product status: $raw") }
 
     private companion object {

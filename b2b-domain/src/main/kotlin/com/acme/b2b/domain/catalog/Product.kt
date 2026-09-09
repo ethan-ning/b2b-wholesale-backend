@@ -31,7 +31,7 @@ class Product(
     val locationCode: String?,
     val variantAxis: VariantAxis?,
     val attributes: Map<String, String>,
-    val status: ProductStatus,
+    val visibility: ProductVisibility,
     val categoryIds: List<Long>,
     val primaryCategoryId: Long?,
     val imageUrls: List<String>,
@@ -51,30 +51,32 @@ class Product(
         }
     }
 
-    val isPublished: Boolean get() = status == ProductStatus.ACTIVE
+    val isVisible: Boolean get() = visibility == ProductVisibility.VISIBLE
 
     /**
-     * Whether this product can be shown to a dealer at all.
+     * Whether this product could be shown to a dealer at all, whatever [visibility] says.
      *
      * An ERP import arrives with no dealer price — Sellfox knows cost and stock, not what
-     * a dealer pays — so a product is not merely hidden until someone prices it, it is
-     * unsellable. Activating one would put it in the catalog at whatever
-     * [baseWholesalePrice] happens to be, which for an import is zero.
+     * a dealer pays — so it is not merely hidden until someone prices it, it is unsellable:
+     * making it visible would offer it at [baseWholesalePrice], which for an import is zero.
      *
-     * [pricedSkus] is the set of SKU codes that have at least one tier price. Every SKU
-     * must be covered: a half-priced product shows some of its pack sizes at list price
-     * and the rest at nothing, which reads as a bug to the dealer looking at it.
+     * [pricedSkus] is the SKU codes carrying at least one tier price. Every SKU still on
+     * sale must be covered — a half-priced product shows some pack sizes at list price and
+     * the rest at nothing, which reads as a bug rather than as a missing price.
      */
-    fun isSellable(pricedSkus: Set<SkuCode>): Boolean =
-        variants.isNotEmpty() && variants.all { it.sku in pricedSkus }
+    fun isSellable(pricedSkus: Set<SkuCode>): Boolean {
+        // A SKU the supplier has stopped selling is not something to offer, priced or not.
+        val onSale = variants.filter { it.active }
+        return onSale.isNotEmpty() && onSale.all { it.sku in pricedSkus }
+    }
 
     /**
      * Returns the same product in a different visibility state. Everything else is carried
      * across, so deactivating cannot quietly lose pricing or categories along the way.
      */
-    fun withStatus(status: ProductStatus) = Product(
+    fun withVisibility(visibility: ProductVisibility) = Product(
         id, spuCode, name, brand, description, baseWholesalePrice, locationCode, variantAxis,
-        attributes, status, categoryIds, primaryCategoryId, imageUrls, variants,
+        attributes, visibility, categoryIds, primaryCategoryId, imageUrls, variants,
     )
 
     /**
@@ -86,7 +88,7 @@ class Product(
         val remaining = categoryIds.filterNot { it == categoryId }
         return Product(
             id, spuCode, name, brand, description, baseWholesalePrice, locationCode, variantAxis,
-            attributes, status, remaining,
+            attributes, visibility, remaining,
             if (primaryCategoryId == categoryId) remaining.firstOrNull() else primaryCategoryId,
             imageUrls, variants,
         )

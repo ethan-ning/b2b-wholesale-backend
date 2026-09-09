@@ -44,7 +44,7 @@ object ProductFixtures {
         locationCode = "C2-1",
         variantAxis = axis,
         attributes = emptyMap(),
-        status = ProductStatus.ACTIVE,
+        visibility = ProductVisibility.VISIBLE,
         categoryIds = categoryIds,
         primaryCategoryId = primaryCategoryId,
         imageUrls = emptyList(),

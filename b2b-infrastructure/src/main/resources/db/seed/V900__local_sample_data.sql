@@ -37,16 +37,16 @@ INSERT INTO category (id, name, slug, parent_id, sort_order) VALUES
 SELECT setval('category_id_seq', (SELECT MAX(id) FROM category));
 
 -- Two products, one per variant axis: gloves vary by size, mufflers by pack quantity.
-INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_price, location_code, variant_axis, attributes_json, status) VALUES
+INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_price, location_code, variant_axis, attributes_json, visibility) VALUES
     (1, 'GL100-BLK', 'Riding Gloves - Black', 'RiderEdge',
      'Touchscreen-compatible leather riding gloves, reinforced palm.',
-     18.00, 'C2-1', 'Size', '{"Color":"Black","Material":"Genuine Leather"}', 'ACTIVE'),
+     18.00, 'C2-1', 'Size', '{"Color":"Black","Material":"Genuine Leather"}', 'VISIBLE'),
     (2, 'PL001-BLK', 'Muffler Extension Pipe - Black', 'ProLine',
      'Heavy-duty stainless steel muffler extension pipe.',
-     19.00, 'A1-1', 'Pack Qty', '{"Color":"Black","Material":"Stainless Steel"}', 'ACTIVE'),
+     19.00, 'A1-1', 'Pack Qty', '{"Color":"Black","Material":"Stainless Steel"}', 'VISIBLE'),
     (3, 'LT200-WHT', 'LED Work Light Bar - White', 'LumenPro',
      'Deactivated product, not visible to dealers.',
-     34.00, 'B3-1', 'Pack Qty', '{"Wattage":"120W"}', 'INACTIVE');
+     34.00, 'B3-1', 'Pack Qty', '{"Wattage":"120W"}', 'HIDDEN');
 SELECT setval('product_id_seq', (SELECT MAX(id) FROM product));
 
 -- sort_order is explicit: S < M < L < XL is not lexical.
@@ -86,37 +86,37 @@ INSERT INTO category (id, name, slug, parent_id, sort_order) VALUES
     (33, 'Brakes',     'brakes',     1, 5);
 SELECT setval('category_id_seq', (SELECT MAX(id) FROM category));
 
-INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_price, location_code, variant_axis, attributes_json, status) VALUES
+INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_price, location_code, variant_axis, attributes_json, visibility) VALUES
     (4,  'GL100-BRN', 'Riding Gloves - Brown', 'RiderEdge',
          'Touchscreen-compatible leather riding gloves, brown.',
-         18.00, 'C2-2', 'Size', '{"Color":"Brown","Material":"Genuine Leather"}', 'ACTIVE'),
+         18.00, 'C2-2', 'Size', '{"Color":"Brown","Material":"Genuine Leather"}', 'VISIBLE'),
     (5,  'JK400-BLK', 'Motorcycle Leather Jacket - Black', 'RiderEdge',
          'Premium cowhide leather motorcycle jacket, CE-rated armor pockets.',
-         89.00, 'C1-1', 'Size', '{"Color":"Black","Material":"Cowhide Leather","CE_Armor":"Level 1"}', 'ACTIVE'),
+         89.00, 'C1-1', 'Size', '{"Color":"Black","Material":"Cowhide Leather","CE_Armor":"Level 1"}', 'VISIBLE'),
     (6,  'JK400-BRN', 'Motorcycle Leather Jacket - Brown', 'RiderEdge',
          'Premium cowhide leather motorcycle jacket, brown.',
-         92.00, 'C1-2', 'Size', '{"Color":"Brown","Material":"Cowhide Leather"}', 'ACTIVE'),
+         92.00, 'C1-2', 'Size', '{"Color":"Brown","Material":"Cowhide Leather"}', 'VISIBLE'),
     (7,  'PL001-CHR', 'Muffler Extension Pipe - Chrome', 'ProLine',
          'Heavy-duty stainless steel muffler extension pipe, mirror chrome finish.',
-         22.00, 'A1-2', 'Pack Qty', '{"Color":"Chrome","Material":"Stainless Steel"}', 'ACTIVE'),
+         22.00, 'A1-2', 'Pack Qty', '{"Color":"Chrome","Material":"Stainless Steel"}', 'VISIBLE'),
     (8,  'EX100', 'Performance Exhaust Tip', 'TurboKing',
          '4-inch performance exhaust tip, universal fit.',
-         14.50, 'A2-1', 'Pack Qty', '{"Diameter":"4 inch","Finish":"Polished"}', 'ACTIVE'),
+         14.50, 'A2-1', 'Pack Qty', '{"Diameter":"4 inch","Finish":"Polished"}', 'VISIBLE'),
     -- Single SKU, so no variant axis. The domain only requires one above a single SKU.
     (9,  'LT201-AMB', 'LED Light Bar - Amber', 'LumenPro',
          '20-inch LED light bar, amber lens for fog and dust.',
-         32.00, 'B3-2', NULL, '{"Color":"Amber","Wattage":"120W"}', 'ACTIVE'),
+         32.00, 'B3-2', NULL, '{"Color":"Amber","Wattage":"120W"}', 'VISIBLE'),
     (10, 'TL500', 'Socket Wrench Set', 'GripMaster',
          '40-piece metric and SAE socket wrench set with case.',
-         28.00, 'D1-1', 'Pack Qty', '{"Pieces":"40","Drive_Size":"3/8 inch"}', 'ACTIVE'),
+         28.00, 'D1-1', 'Pack Qty', '{"Pieces":"40","Drive_Size":"3/8 inch"}', 'VISIBLE'),
     -- Deactivated: hidden from dealers, still findable by the admin filter.
     (11, 'WH900-SLV', 'Alloy Wheel - Silver', 'RoadForge',
          'Cast alloy wheel, discontinued line.',
-         145.00, 'E1-1', 'Size', '{"Finish":"Silver"}', 'INACTIVE'),
+         145.00, 'E1-1', 'Size', '{"Finish":"Silver"}', 'HIDDEN'),
     -- Deactivated, and deliberately left unpriced so pricing falls through to list price.
     (12, 'BR300-RED', 'Brake Caliper Cover - Red', 'StopTech',
          'Powder-coated caliper cover, awaiting pricing.',
-         24.00, 'E2-1', 'Pack Qty', '{"Color":"Red"}', 'INACTIVE');
+         24.00, 'E2-1', 'Pack Qty', '{"Color":"Red"}', 'HIDDEN');
 SELECT setval('product_id_seq', (SELECT MAX(id) FROM product));
 
 -- sort_order is explicit throughout: S < M < L < XL is not lexical.
@@ -217,19 +217,19 @@ INSERT INTO category (id, name, slug, parent_id, sort_order) VALUES
     (34, 'Luggage', 'luggage', 2, 3);
 SELECT setval('category_id_seq', (SELECT MAX(id) FROM category));
 
-INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_price, location_code, variant_axis, attributes_json, status) VALUES
-    (13, 'VS200-BLK', 'Leather Vest - Black', 'RiderEdge', NULL, 64.00, 'C1-3', 'Size', '{"Color":"Black","Material":"Cowhide Leather"}', 'ACTIVE'),
-    (14, 'CH500-BLK', 'Riding Chaps - Black', 'RiderEdge', NULL, 78.00, 'C1-4', 'Size', '{"Color":"Black","Material":"Cowhide Leather"}', 'ACTIVE'),
-    (15, 'GL200-BLK', 'Winter Riding Gloves - Black', 'RiderEdge', NULL, 26.00, 'C2-3', 'Size', '{"Color":"Black","Lining":"Thinsulate"}', 'ACTIVE'),
-    (16, 'LT300-WHT', 'LED Spot Light - White', 'LumenPro', NULL, 21.00, 'B3-3', 'Pack Qty', '{"Wattage":"40W","IP_Rating":"IP67"}', 'ACTIVE'),
-    (17, 'LT400-RED', 'Tail Light Kit - Red', 'LumenPro', NULL, 27.50, 'B3-4', 'Pack Qty', '{"Color":"Red"}', 'INACTIVE'),
-    (18, 'EX200-SS', 'Slip-On Muffler - Stainless', 'TurboKing', NULL, 96.00, 'A2-2', 'Pack Qty', '{"Material":"Stainless Steel"}', 'ACTIVE'),
-    (19, 'TL600', 'Torque Wrench 1/2 inch', 'GripMaster', NULL, 54.00, 'D1-2', NULL, '{"Drive_Size":"1/2 inch","Range":"20-200 Nm"}', 'ACTIVE'),
-    (20, 'TL700', 'Precision Screwdriver Set', 'GripMaster', NULL, 16.00, 'D1-3', 'Pack Qty', '{"Pieces":"24"}', 'ACTIVE'),
-    (21, 'WH901-BLK', 'Alloy Wheel - Matte Black', 'RoadForge', NULL, 158.00, 'E1-2', 'Size', '{"Finish":"Matte Black"}', 'ACTIVE'),
-    (22, 'BR400-BLU', 'Brake Pad Set - Sintered', 'StopTech', NULL, 31.00, 'E2-2', 'Pack Qty', '{"Compound":"Sintered"}', 'ACTIVE'),
-    (23, 'BR500-BLK', 'Braided Brake Line Kit', 'StopTech', NULL, 44.00, 'E2-3', NULL, '{"Length":"36 inch"}', 'INACTIVE'),
-    (24, 'HG100-BLK', 'Helmet Bag - Black', 'RiderEdge', NULL, 19.00, 'C3-1', 'Pack Qty', '{"Material":"600D Nylon"}', 'ACTIVE');
+INSERT INTO product (id, spu_code, name, brand, description, base_wholesale_price, location_code, variant_axis, attributes_json, visibility) VALUES
+    (13, 'VS200-BLK', 'Leather Vest - Black', 'RiderEdge', NULL, 64.00, 'C1-3', 'Size', '{"Color":"Black","Material":"Cowhide Leather"}', 'VISIBLE'),
+    (14, 'CH500-BLK', 'Riding Chaps - Black', 'RiderEdge', NULL, 78.00, 'C1-4', 'Size', '{"Color":"Black","Material":"Cowhide Leather"}', 'VISIBLE'),
+    (15, 'GL200-BLK', 'Winter Riding Gloves - Black', 'RiderEdge', NULL, 26.00, 'C2-3', 'Size', '{"Color":"Black","Lining":"Thinsulate"}', 'VISIBLE'),
+    (16, 'LT300-WHT', 'LED Spot Light - White', 'LumenPro', NULL, 21.00, 'B3-3', 'Pack Qty', '{"Wattage":"40W","IP_Rating":"IP67"}', 'VISIBLE'),
+    (17, 'LT400-RED', 'Tail Light Kit - Red', 'LumenPro', NULL, 27.50, 'B3-4', 'Pack Qty', '{"Color":"Red"}', 'HIDDEN'),
+    (18, 'EX200-SS', 'Slip-On Muffler - Stainless', 'TurboKing', NULL, 96.00, 'A2-2', 'Pack Qty', '{"Material":"Stainless Steel"}', 'VISIBLE'),
+    (19, 'TL600', 'Torque Wrench 1/2 inch', 'GripMaster', NULL, 54.00, 'D1-2', NULL, '{"Drive_Size":"1/2 inch","Range":"20-200 Nm"}', 'VISIBLE'),
+    (20, 'TL700', 'Precision Screwdriver Set', 'GripMaster', NULL, 16.00, 'D1-3', 'Pack Qty', '{"Pieces":"24"}', 'VISIBLE'),
+    (21, 'WH901-BLK', 'Alloy Wheel - Matte Black', 'RoadForge', NULL, 158.00, 'E1-2', 'Size', '{"Finish":"Matte Black"}', 'VISIBLE'),
+    (22, 'BR400-BLU', 'Brake Pad Set - Sintered', 'StopTech', NULL, 31.00, 'E2-2', 'Pack Qty', '{"Compound":"Sintered"}', 'VISIBLE'),
+    (23, 'BR500-BLK', 'Braided Brake Line Kit', 'StopTech', NULL, 44.00, 'E2-3', NULL, '{"Length":"36 inch"}', 'HIDDEN'),
+    (24, 'HG100-BLK', 'Helmet Bag - Black', 'RiderEdge', NULL, 19.00, 'C3-1', 'Pack Qty', '{"Material":"600D Nylon"}', 'VISIBLE');
 SELECT setval('product_id_seq', (SELECT MAX(id) FROM product));
 
 -- sort_order is explicit: sizes are not lexical, and pack rows read low to high.

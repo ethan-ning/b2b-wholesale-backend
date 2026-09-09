@@ -70,6 +70,7 @@ class SpuRegrouper(
                 append(": ${outcome.productsCreated} new")
                 append(", ${outcome.skusCreated} SKUs added")
                 if (outcome.skusMoved > 0) append(", ${outcome.skusMoved} re-filed")
+                if (outcome.skusWithdrawn > 0) append(", ${outcome.skusWithdrawn} withdrawn")
                 if (outcome.emptyProductsRemoved > 0) append(", ${outcome.emptyProductsRemoved} emptied removed")
                 if (deactivated > 0) append(", $deactivated deactivated")
                 append(".")

@@ -17,7 +17,7 @@ interface ProductJpaRepository : JpaRepository<ProductDO, Long> {
     @Query(
         """
         SELECT DISTINCT p FROM ProductDO p
-        WHERE (:status IS NULL OR p.status = :status)
+        WHERE (:visibility IS NULL OR p.visibility = :visibility)
           AND (:text IS NULL
                OR LOWER(p.name) LIKE :text
                OR LOWER(p.spuCode) LIKE :text
@@ -27,11 +27,11 @@ interface ProductJpaRepository : JpaRepository<ProductDO, Long> {
     )
     fun search(
         @Param("text") text: String?,
-        @Param("status") status: String?,
+        @Param("visibility") visibility: String?,
     ): List<ProductDO>
 
-    fun countByStatus(status: String): Long
-    fun findBySourceAndStatus(source: String, status: String): List<ProductDO>
+    fun countByVisibility(visibility: String): Long
+    fun findBySourceAndVisibility(source: String, visibility: String): List<ProductDO>
     fun findBySourceIn(sources: Collection<String>): List<ProductDO>
 
     @Query("SELECT DISTINCT p FROM ProductDO p JOIN p.categories c WHERE c.categoryId = :categoryId")
@@ -68,6 +68,7 @@ interface ProductVariantJpaRepository : JpaRepository<ProductVariantDO, Long> {
     fun countByAvailableStockGreaterThanAndAvailableStockLessThan(floor: Int, ceiling: Int): Long
     fun countByAvailableStock(availableStock: Int): Long
     fun findBySkuIn(skus: Collection<String>): List<ProductVariantDO>
+    fun findByProductSourceAndStatus(source: String, status: String): List<ProductVariantDO>
 }
 
 interface TierPriceJpaRepository : JpaRepository<TierPriceDO, Long> {

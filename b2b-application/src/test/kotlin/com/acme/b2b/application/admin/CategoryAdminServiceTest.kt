@@ -3,7 +3,7 @@ package com.acme.b2b.application.admin
 import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.catalog.Category
 import com.acme.b2b.domain.catalog.Product
-import com.acme.b2b.domain.catalog.ProductStatus
+import com.acme.b2b.domain.catalog.ProductVisibility
 import com.acme.b2b.domain.catalog.ProductVariant
 import com.acme.b2b.domain.catalog.StockLevel
 import com.acme.b2b.types.Money
@@ -31,7 +31,7 @@ class CategoryAdminServiceTest {
         locationCode = null,
         variantAxis = VariantAxis.SIZE,
         attributes = emptyMap(),
-        status = ProductStatus.ACTIVE,
+        visibility = ProductVisibility.VISIBLE,
         categoryIds = categoryIds,
         primaryCategoryId = primary,
         imageUrls = emptyList(),

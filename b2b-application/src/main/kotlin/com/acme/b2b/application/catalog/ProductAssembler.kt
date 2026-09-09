@@ -31,7 +31,7 @@ object ProductAssembler {
             locationCode = product.locationCode,
             variantAxis = product.variantAxis?.label,
             attributes = product.attributes,
-            status = product.status.name,
+            visibility = product.visibility.name,
             sellable = sellable,
             categories = product.categoryIds.map { id ->
                 ProductCategoryDTO(

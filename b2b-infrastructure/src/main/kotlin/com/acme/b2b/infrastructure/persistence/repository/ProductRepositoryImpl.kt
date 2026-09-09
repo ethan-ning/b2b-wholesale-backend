@@ -45,17 +45,17 @@ class ProductRepositoryImpl(
 
     override fun countAll(): Long = jpa.count()
 
-    override fun countByStatus(status: ProductStatus): Long = jpa.countByStatus(status.name)
+    override fun countByVisibility(visibility: ProductVisibility): Long = jpa.countByVisibility(visibility.name)
 
     override fun search(criteria: ProductSearchCriteria, page: Page): PageOf<Product> {
         val text = criteria.text?.lowercase()?.let { "%$it%" }
         // A dealer sees only ACTIVE; an admin may narrow to one status or see them all.
-        val status = when {
-            criteria.onlyPublished -> ProductStatus.ACTIVE.name
-            else -> criteria.status?.name
+        val visibility = when {
+            criteria.onlyVisible -> ProductVisibility.VISIBLE.name
+            else -> criteria.visibility?.name
         }
 
-        var found = jpa.search(text, status).map { converter.toDomain(it) }
+        var found = jpa.search(text, visibility).map { converter.toDomain(it) }
 
         val categoryId = criteria.categoryId
         if (categoryId != null) {
