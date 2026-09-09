@@ -126,9 +126,19 @@ Two rules the code enforces structurally rather than by review:
 
 ### Local sample data
 
-`db/seed/V900__local_sample_catalog.sql` ships in `b2b-infrastructure` but only applies
-when `application-local.yml` adds `classpath:db/seed` to `spring.flyway.locations`.
-Production never lists that location, so the seed cannot reach it.
+`db/seed/V9xx__*.sql` ships in `b2b-infrastructure` but only applies when
+`application-local.yml` adds `classpath:db/seed` to `spring.flyway.locations`. Production
+never lists that location, so the seed cannot reach it.
+
+24 products / 55 SKUs / 100 tier-price rows, chosen to exercise the cases a handful of
+rows would not: both variant axes and two single-SKU products with no axis at all; all
+three statuses, so the admin filters have something to find; every stock state; a product
+with no tier prices, which must fall through to list price; one with no image; one filed
+under two categories; and enough rows to page past the default of 10.
+
+Seeds accumulate as new versioned files rather than edits to existing ones — an applied
+migration's checksum is fixed and `validate-on-migrate` rejects a change, so editing one
+would break every database that already has it.
 
 ## Known gaps
 
