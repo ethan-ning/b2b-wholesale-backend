@@ -8,9 +8,6 @@ plugins {
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
-    group = "com.acme.b2b"
-    version = "0.1.0-SNAPSHOT"
-
     repositories { mavenCentral() }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {

@@ -123,9 +123,22 @@ as a Gradle platform, so no module names a version.
 
 ### Where versions live
 
-`gradle/libs.versions.toml` declares `java`, `kotlin`, `springBoot`, and every library
-and plugin. Each entry is consumed by the build — `java` feeds `jvmToolchain()`, so that
-one line determines the bytecode — and no `build.gradle.kts` contains a version literal.
+Two files, split by what the value *is*:
+
+- **`gradle.properties`** — project coordinates (`group`, `version`) and how the build
+  runs (parallel, caching, daemon JVM args). Gradle reads `group` and `version` into
+  every project, which is why they belong here rather than in `build.gradle.kts`.
+- **`gradle/libs.versions.toml`** — what the build depends on: `java`, `kotlin`,
+  `springBoot`, and every library and plugin. `java` feeds `jvmToolchain()`, so that one
+  line determines the bytecode, and no `build.gradle.kts` contains a version literal.
+
+Dependency versions are deliberately *not* in `gradle.properties`. A project property is
+overridable by `-PkotlinVersion=…`, by an `ORG_GRADLE_PROJECT_kotlinVersion` environment
+variable, and by a stale `~/.gradle/gradle.properties` — silently, with no warning. That
+is the right behaviour for build settings and the wrong behaviour for the compiler
+version. Catalog entries cannot be overridden that way, and give type-safe accessors
+(`libs.versions.kotlin`) that fail at configuration time on a typo rather than resolving
+to an empty string.
 
 Gradle's own version lives in `gradle/wrapper/gradle-wrapper.properties`, because the
 wrapper bootstraps before any build script runs. It is not mirrored in the catalog: a
