@@ -3,6 +3,7 @@ package com.acme.b2b.application.admin
 import com.acme.b2b.application.admin.dto.AdminProductDTO
 import com.acme.b2b.application.admin.dto.TierPriceDTO
 import com.acme.b2b.application.catalog.ProductAssembler
+import com.acme.b2b.application.catalog.SortParser
 import com.acme.b2b.application.catalog.dto.PagedDTO
 import com.acme.b2b.application.catalog.dto.ProductDTO
 import com.acme.b2b.application.support.UseCaseViolation
@@ -40,6 +41,7 @@ class ProductAdminService(
             // An admin sees drafts and archived products; a dealer never does.
             onlyPublished = false,
             status = query.status?.takeIf { it.isNotBlank() }?.let { parseStatus(it) },
+            sort = SortParser.parse(query.sort, query.direction),
         )
         val page = products.search(criteria, Page(query.page, query.size))
         val names = categoryNames()

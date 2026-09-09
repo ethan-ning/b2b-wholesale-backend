@@ -30,6 +30,9 @@ data class TierPriceEntry(
 data class AdminProductQuery(
     val search: String? = null,
     val status: String? = null,
+    /** spuCode (default), name, brand or price. */
+    val sort: String? = null,
+    val direction: String? = null,
     val page: Int = 0,
     val size: Int = 10,
 )

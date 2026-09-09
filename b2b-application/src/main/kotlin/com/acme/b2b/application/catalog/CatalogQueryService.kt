@@ -39,7 +39,7 @@ class CatalogQueryService(
             categoryId = query.categoryId,
             priceMin = query.priceMin?.let { Money.of(it) },
             priceMax = query.priceMax?.let { Money.of(it) },
-            sort = parseSort(query.sort),
+            sort = SortParser.parse(query.sort, null),
         )
 
         val page = products.search(criteria, Page(query.page, query.size))
@@ -86,10 +86,4 @@ class CatalogQueryService(
         return flat
     }
 
-    private fun parseSort(raw: String): ProductSort = when (raw.lowercase()) {
-        "price_asc" -> ProductSort.PRICE_ASC
-        "price_desc" -> ProductSort.PRICE_DESC
-        "name_asc" -> ProductSort.NAME_ASC
-        else -> ProductSort.RELEVANCE
-    }
 }

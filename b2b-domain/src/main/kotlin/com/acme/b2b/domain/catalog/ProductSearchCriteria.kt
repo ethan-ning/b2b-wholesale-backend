@@ -15,11 +15,27 @@ data class ProductSearchCriteria(
      */
     val priceMin: Money? = null,
     val priceMax: Money? = null,
-    val sort: ProductSort = ProductSort.RELEVANCE,
+    val sort: ProductSort = ProductSort.DEFAULT,
     /** Dealers see only ACTIVE products; an admin browses drafts and archived ones too. */
     val onlyPublished: Boolean = true,
     /** Narrows to one status. Only meaningful when [onlyPublished] is false. */
     val status: ProductStatus? = null,
 )
 
-enum class ProductSort { RELEVANCE, PRICE_ASC, PRICE_DESC, NAME_ASC }
+/**
+ * Sorting as a field plus a direction rather than one enum constant per combination —
+ * four fields times two directions is eight constants that all mean the same two things.
+ */
+enum class ProductSortField { SPU_CODE, NAME, BRAND, PRICE }
+
+enum class SortDirection { ASC, DESC }
+
+data class ProductSort(
+    val field: ProductSortField = ProductSortField.SPU_CODE,
+    val direction: SortDirection = SortDirection.ASC,
+) {
+    companion object {
+        /** The catalog's natural order: by code, ascending. */
+        val DEFAULT = ProductSort()
+    }
+}

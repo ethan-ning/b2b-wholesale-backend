@@ -56,11 +56,7 @@ class ProductRepositoryImpl(
             found = found.filter { product -> product.categoryIds.any { it in wanted } }
         }
 
-        if (criteria.priceMin != null || criteria.priceMax != null || criteria.sort != ProductSort.RELEVANCE) {
-            found = applyPriceRules(found, criteria)
-        } else {
-            found = found.sortedBy { it.name }
-        }
+        found = sorted(filteredByPrice(found, criteria), criteria.sort)
 
         val window = found.drop(page.offset).take(page.size)
         return PageOf(window, found.size.toLong(), page)
@@ -99,23 +95,44 @@ class ProductRepositoryImpl(
      * A product matches a price range if any of its SKUs does, and sorts on its cheapest
      * SKU — the "from" figure the dealer sees on the card.
      */
-    private fun applyPriceRules(products: List<Product>, criteria: ProductSearchCriteria): List<Product> {
-        // Tier is not part of the criteria yet; list price is the sort key until the
-        // price view lands. Tracked in ARCHITECTURE.md.
-        val cheapest = products.associateWith { product -> product.baseWholesalePrice }
-
+    /**
+     * Tier is not part of the criteria yet, so list price is both the filter and the sort
+     * key. Tracked in ARCHITECTURE.md alongside the price view that replaces this.
+     */
+    private fun filteredByPrice(products: List<Product>, criteria: ProductSearchCriteria): List<Product> {
         val min = criteria.priceMin
         val max = criteria.priceMax
-        val filtered = products.filter { product ->
-            val price = cheapest.getValue(product)
+        if (min == null && max == null) return products
+
+        return products.filter { product ->
+            val price = product.baseWholesalePrice
             (min == null || price >= min) && (max == null || price <= max)
         }
+    }
 
-        return when (criteria.sort) {
-            ProductSort.PRICE_ASC -> filtered.sortedBy { cheapest.getValue(it).amount }
-            ProductSort.PRICE_DESC -> filtered.sortedByDescending { cheapest.getValue(it).amount }
-            ProductSort.NAME_ASC -> filtered.sortedBy { it.name }
-            ProductSort.RELEVANCE -> filtered
+    /**
+     * Applied in memory because the window is taken here too — the whole result set is
+     * already loaded. That is the same constraint the price view is meant to lift.
+     */
+    private fun sorted(products: List<Product>, sort: ProductSort): List<Product> {
+        val byField: Comparator<Product> = when (sort.field) {
+            ProductSortField.SPU_CODE -> compareBy { it.spuCode.value }
+            ProductSortField.NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+            ProductSortField.PRICE -> compareBy { it.baseWholesalePrice.amount }
+            ProductSortField.BRAND -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.brand.orEmpty() }
         }
+        val directed = if (sort.direction == SortDirection.ASC) byField else byField.reversed()
+
+        // Unbranded products sort last in both directions. Reversing the whole ordering
+        // would float them to the top on a descending sort, which reads as a bug rather
+        // than as an ordering choice.
+        val comparator =
+            if (sort.field == ProductSortField.BRAND) {
+                compareBy<Product> { it.brand.isNullOrBlank() }.then(directed)
+            } else {
+                directed
+            }
+
+        return products.sortedWith(comparator)
     }
 }
