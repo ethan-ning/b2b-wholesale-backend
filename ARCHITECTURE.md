@@ -144,8 +144,15 @@ Version drift:
 ```
 
 Because the daemon JVM is pinned by criteria rather than by `JAVA_HOME`, the build runs on
-Java 21 whatever the machine's default JDK is, and the foojay resolver downloads it if the
-machine has none.
+Java 21 whatever the machine's default JDK is — `gradle-daemon-jvm.properties` carries
+per-platform download URLs, so a machine with no JDK 21 fetches one. Once the daemon is on
+21, its own JVM satisfies the compile toolchain.
+
+The `foojay-resolver-convention` plugin in `settings.gradle.kts` is therefore **not** used
+by ordinary builds — verified by removing it and building with local JDK detection
+disabled. It exists solely so `updateDaemonJvm` can resolve those download URLs when the
+Java version changes; without it that task fails with "Toolchain download repositories
+have not been configured".
 
 ### Why these versions
 

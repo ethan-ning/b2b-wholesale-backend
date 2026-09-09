@@ -1,5 +1,10 @@
-// Lets Gradle download the Java 25 toolchain on a machine that does not have it, so the
-// project's JDK is a property of the build rather than of whoever is building it.
+// Needed only by `updateDaemonJvm`, which asks it for the per-platform JDK download URLs
+// it bakes into gradle/gradle-daemon-jvm.properties. Day-to-day builds do not use it:
+// those URLs are already in that file, and once the daemon is pinned to Java 21 its own
+// JVM satisfies the compile toolchain.
+//
+// Kept because checkVersionConsistency tells you to run `updateDaemonJvm` when the java
+// version in the catalog changes, and that command fails without this plugin.
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
