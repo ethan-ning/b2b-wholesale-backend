@@ -1,0 +1,28 @@
+# Local development database. Not a deployment artifact — production Postgres is
+# Cloud SQL, provisioned separately.
+#
+#   docker compose up -d       start
+#   docker compose down        stop, keeping data
+#   docker compose down -v     stop and discard data, so the next boot re-runs
+#                              every migration from scratch
+services:
+  postgres:
+    image: postgres:17
+    container_name: b2b-postgres
+    environment:
+      POSTGRES_DB: b2b
+      POSTGRES_USER: b2b
+      POSTGRES_PASSWORD: b2b
+    ports:
+      - "5432:5432"
+    volumes:
+      - b2b-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The app's Flyway step fails outright if it starts first, so wait for readiness.
+      test: ["CMD-SHELL", "pg_isready -U b2b -d b2b"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  b2b-pgdata:

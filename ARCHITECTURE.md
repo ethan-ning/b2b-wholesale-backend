@@ -124,7 +124,33 @@ Deliberate, in rough priority order:
 
 ## Running it
 
-Java 21, declared once as `java` in the version catalog and fed to `jvmToolchain()`.
+### Local database
+
+A Postgres container, defined in `compose.yaml`. Colima provides the Docker runtime on
+macOS without Docker Desktop:
+
+```bash
+colima start --cpu 2 --memory 4     # once per boot
+docker compose up -d                # postgres:17 on :5432
+docker compose down -v              # discard data, so the next run re-applies every migration
+```
+
+Flyway owns the schema and Hibernate runs with `ddl-auto: validate`, so the app refuses to
+start if the mappings and the tables disagree — which makes a successful boot a real check
+that the two are in step.
+
+### The application
+
+```bash
+./gradlew build                     # every module, tests, and the layering guards
+./gradlew :b2b-start:bootRun        # needs the database above
+```
+
+Seeded by `V2` for local development: `admin@example.com` / `admin123`, and the Gold and
+Silver tiers the pricing model is written against. That password is in version control and
+must be changed anywhere beyond a laptop.
+
+Java 21, declared once as `java.version` in `gradle.properties` and fed to `jvmToolchain()`.
 
 The toolchain governs compilation, `test` and `bootRun`, so the whole development loop
 runs on 21 regardless of the machine's default JDK — and a JDK 21 must be installed, or
@@ -136,9 +162,6 @@ Gradle will say so. Only a bare `java -jar` on the built artifact uses whatever
 ./gradlew test           # domain and types tests only — no container needed
 ./gradlew :b2b-start:bootRun
 ```
-
-Needs a Postgres at `DB_URL` (defaults to `jdbc:postgresql://localhost:5432/b2b`).
-Flyway owns the schema; Hibernate is set to `validate` and never alters it.
 
 Versions live in `gradle.properties`; the Spring Boot BOM is applied as a Gradle
 platform, so no module names a library version.
