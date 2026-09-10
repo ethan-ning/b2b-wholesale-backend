@@ -12,3 +12,6 @@ local.properties
 .env
 .env.*
 *.local.yml
+
+# Built portal, copied in by build-image.sh before the image build.
+frontend-dist/

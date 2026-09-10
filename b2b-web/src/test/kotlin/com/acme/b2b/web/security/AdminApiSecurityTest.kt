@@ -107,6 +107,17 @@ class AdminApiSecurityTest {
     }
 
     @Test
+    fun `the portal's own admin path is public, the admin API behind it is not`() {
+        // Both begin /admin. One is a page a browser must be able to load before it has a
+        // token; the other is the data. Widening the first must never widen the second.
+        mockMvc.perform(get("/admin/login")).andExpect(status().isNotFound)
+        mockMvc.perform(get("/admin/products")).andExpect(status().isNotFound)
+
+        mockMvc.perform(get("/api/admin/customers")).andExpect(status().isUnauthorized)
+        mockMvc.perform(get("/api/admin/dashboard")).andExpect(status().isUnauthorized)
+    }
+
+    @Test
     fun `admin routes reject a dealer's token`() {
         mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $dealerToken"))
             .andExpect(status().isForbidden)

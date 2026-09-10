@@ -174,7 +174,12 @@ developer defaults.
 
 ```bash
 ./gradlew :b2b-start:bootJar    # b2b-start/build/libs/
+./build-image.sh                # the same jar, with the portal, as one container image
 ```
+
+The portal is packaged into the same image and served from the same origin, so there is
+one artifact to deploy and nothing is cross-origin. See [DEPLOY.md](DEPLOY.md) for Cloud
+Run — including the two flags the background sync depends on.
 
 Two things the local seed does that production must do deliberately:
 

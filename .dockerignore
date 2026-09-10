@@ -1,0 +1,16 @@
+# Everything the build does not need. Keeps the context small and stops a local build
+# directory or a stray .env leaking into an image.
+.git
+.gradle
+.kotlin
+build/
+*/build/
+*/bin
+.idea
+*.iml
+.env
+.env.*
+*.log
+README.md
+DEPLOY.md
+ARCHITECTURE.md

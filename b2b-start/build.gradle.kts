@@ -15,6 +15,10 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("org.postgresql:postgresql")
+    // Cloud SQL reaches the database over a unix socket that Cloud Run mounts, and the
+    // Postgres driver cannot speak to one on its own. Runtime only, and inert unless the
+    // JDBC URL names the socket factory — local development is unaffected.
+    runtimeOnly("com.google.cloud.sql:postgres-socket-factory:1.25.2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("com.h2database:h2")
 }

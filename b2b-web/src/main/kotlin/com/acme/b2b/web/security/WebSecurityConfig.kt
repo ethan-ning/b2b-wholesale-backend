@@ -39,6 +39,18 @@ class WebSecurityConfig {
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/auth/login", "/api/admin/auth/login").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
+                    // The single-page app, when it is packaged alongside the API.
+                    //
+                    // Its files and its routes, because a browser opening /admin/login has
+                    // no token yet and the page it needs in order to get one must not 401.
+                    // Nothing is given away: these serve the same index.html to everyone,
+                    // and every byte of data behind them still comes from /api, which is
+                    // not on this list.
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/", "/index.html", "/favicon.svg", "/assets/**",
+                        "/login", "/change-password", "/search", "/products/**", "/admin/**",
+                    ).permitAll()
                     // A dealer still on an admin-issued password holds a token whose only
                     // reachable endpoint is this one. That is what makes the forced change
                     // enforced rather than merely requested of the client.

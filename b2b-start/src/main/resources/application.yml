@@ -64,6 +64,12 @@ sellfox:
 server:
   port: ${SERVER_PORT:8080}
 
+# Whether this deployment carries the portal as well as the API. The container image sets
+# it; running the API alone leaves it off, because in development Vite serves the portal
+# and forwarding unknown paths to an index.html that is not there would only confuse.
+app:
+  serve-spa: ${APP_SERVE_SPA:false}
+
 logging:
   level:
     root: INFO
