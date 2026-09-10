@@ -49,3 +49,33 @@ class ProductVariantDO(
     @Column(name = "stock_synced_at")
     var stockSyncedAt: Instant? = null,
 )
+
+/**
+ * One warehouse's share of a SKU's stock. Composite key, no surrogate id: the pair is the
+ * identity, and a sync replaces a SKU's rows rather than editing them individually.
+ */
+@Entity
+@Table(name = "variant_warehouse_stock")
+@IdClass(VariantWarehouseStockId::class)
+class VariantWarehouseStockDO(
+    @Id
+    var sku: String = "",
+
+    @Id
+    @Column(name = "warehouse_id")
+    var warehouseId: Long = 0,
+
+    @Column(nullable = false)
+    var available: Int = 0,
+
+    @Column(nullable = false)
+    var incoming: Int = 0,
+
+    @Column(name = "synced_at", nullable = false)
+    var syncedAt: Instant = Instant.EPOCH,
+)
+
+data class VariantWarehouseStockId(
+    var sku: String = "",
+    var warehouseId: Long = 0,
+) : java.io.Serializable

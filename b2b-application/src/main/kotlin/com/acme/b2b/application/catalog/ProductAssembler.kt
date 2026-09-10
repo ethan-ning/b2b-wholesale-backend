@@ -69,6 +69,8 @@ object ProductAssembler {
             inventory = InventoryDTO(
                 availableStock = variant.stock.available,
                 incomingStock = variant.stock.incoming,
+                lowStock = variant.stock.isLow,
+                outOfStock = variant.stock.isOutOfStock,
                 updatedAt = variant.stock.lastSyncedAt.toString(),
             ),
         )

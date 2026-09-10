@@ -54,6 +54,13 @@ data class VariantDTO(
 data class InventoryDTO(
     val availableStock: Int,
     val incomingStock: Int,
+    /**
+     * In stock but running down, per StockLevel.LOW_STOCK_THRESHOLD. Sent rather than left
+     * for the client to work out: a threshold copied into the UI is a second definition,
+     * and the two drift into disagreeing about the same row.
+     */
+    val lowStock: Boolean,
+    val outOfStock: Boolean,
     val updatedAt: String,
 )
 

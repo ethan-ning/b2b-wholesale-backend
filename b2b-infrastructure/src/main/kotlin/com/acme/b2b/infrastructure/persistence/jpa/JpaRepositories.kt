@@ -43,6 +43,27 @@ interface ProductJpaRepository : JpaRepository<ProductDO, Long> {
  * the admin's stock screen is a flat list across every SKU, and hydrating aggregates to
  * render it would be slower and a misuse of the aggregate.
  */
+/**
+ * The per-warehouse stock rows behind each SKU's total. Joined to the warehouse registry
+ * on read so the admin sees a name rather than an id; a warehouse that has left the scope
+ * is gone from the registry, so the name is left blank rather than the row dropped.
+ */
+interface VariantWarehouseStockJpaRepository : JpaRepository<VariantWarehouseStockDO, VariantWarehouseStockId> {
+
+    fun deleteBySkuIn(skus: Collection<String>)
+
+    @Query(
+        """
+        SELECT s.sku, s.warehouseId, COALESCE(w.name, ''), s.available, s.incoming, s.syncedAt
+        FROM VariantWarehouseStockDO s
+        LEFT JOIN SellfoxWarehouseDO w ON w.warehouseId = s.warehouseId
+        WHERE s.sku IN :skus
+        ORDER BY s.sku, COALESCE(w.name, ''), s.warehouseId
+        """
+    )
+    fun findLinesBySkuIn(@Param("skus") skus: Collection<String>): List<Array<Any>>
+}
+
 interface ProductVariantJpaRepository : JpaRepository<ProductVariantDO, Long> {
 
     @Query(

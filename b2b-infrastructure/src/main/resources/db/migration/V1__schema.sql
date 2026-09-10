@@ -66,6 +66,23 @@ CREATE TABLE product_variant (
 );
 CREATE INDEX idx_variant_product ON product_variant (product_id);
 
+-- The breakdown behind product_variant.available_stock, which is these rows summed.
+--
+-- A dealer is only shown the total — which warehouse it ships from is a fulfilment
+-- concern — but an admin asking why a number looks wrong needs to see where it came from,
+-- and "40 in TX, 0 in TN, 300 on the way to TX" is a different answer from "40 somewhere".
+--
+-- Rewritten wholesale per SKU on every stock sync: a warehouse dropping out of scope must
+-- take its rows with it, and a row that is merely absent from the next read means zero.
+CREATE TABLE variant_warehouse_stock (
+    sku           TEXT NOT NULL REFERENCES product_variant (sku) ON DELETE CASCADE,
+    warehouse_id  BIGINT NOT NULL,
+    available     INT NOT NULL DEFAULT 0 CHECK (available >= 0),
+    incoming      INT NOT NULL DEFAULT 0 CHECK (incoming >= 0),
+    synced_at     TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (sku, warehouse_id)
+);
+
 CREATE TABLE product_image (
     id          BIGSERIAL PRIMARY KEY,
     product_id  BIGINT NOT NULL REFERENCES product (id) ON DELETE CASCADE,

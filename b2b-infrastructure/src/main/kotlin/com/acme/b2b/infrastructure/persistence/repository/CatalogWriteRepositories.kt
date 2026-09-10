@@ -6,11 +6,15 @@ import com.acme.b2b.domain.catalog.ProductStockRepository
 import com.acme.b2b.domain.catalog.RegroupOutcome
 import com.acme.b2b.domain.catalog.RegroupedFamily
 import com.acme.b2b.domain.catalog.SkuStockUpdate
+import com.acme.b2b.domain.catalog.VariantStockBreakdownRepository
+import com.acme.b2b.domain.catalog.WarehouseStockLine
 import com.acme.b2b.domain.catalog.RegroupedSku
 import com.acme.b2b.infrastructure.persistence.entity.ProductDO
 import com.acme.b2b.infrastructure.persistence.entity.ProductVariantDO
+import com.acme.b2b.infrastructure.persistence.entity.VariantWarehouseStockDO
 import com.acme.b2b.infrastructure.persistence.jpa.ProductJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository
+import com.acme.b2b.infrastructure.persistence.jpa.VariantWarehouseStockJpaRepository
 import org.springframework.stereotype.Repository
 import java.time.Instant
 
@@ -22,6 +26,7 @@ import java.time.Instant
 @Repository
 class ProductStockRepositoryImpl(
     private val variants: ProductVariantJpaRepository,
+    private val warehouseStock: VariantWarehouseStockJpaRepository,
 ) : ProductStockRepository {
 
     override fun applyStock(updates: List<SkuStockUpdate>): Int {
@@ -35,7 +40,45 @@ class ProductStockRepositoryImpl(
             row.stockSyncedAt = update.syncedAt
         }
         variants.saveAll(rows)
+
+        // Replaced rather than merged, and flushed between: a warehouse that has left the
+        // scope contributes nothing to the new total, so its old row must not survive to
+        // suggest otherwise.
+        val matchedSkus = rows.map { it.sku }.toSet()
+        if (matchedSkus.isNotEmpty()) {
+            warehouseStock.deleteBySkuIn(matchedSkus)
+            warehouseStock.flush()
+            warehouseStock.saveAll(
+                matchedSkus.flatMap { sku ->
+                    val update = bySku.getValue(sku)
+                    update.byWarehouse.map { line ->
+                        VariantWarehouseStockDO(sku, line.warehouseId, line.available, line.incoming, update.syncedAt)
+                    }
+                }
+            )
+        }
         return rows.size
+    }
+}
+
+/** The breakdown, read back for the admin product detail view. */
+@Repository
+class VariantStockBreakdownRepositoryImpl(
+    private val warehouseStock: VariantWarehouseStockJpaRepository,
+) : VariantStockBreakdownRepository {
+
+    override fun findBySkus(skus: List<String>): List<WarehouseStockLine> {
+        if (skus.isEmpty()) return emptyList()
+        return warehouseStock.findLinesBySkuIn(skus).map { row ->
+            WarehouseStockLine(
+                sku = row[0] as String,
+                warehouseId = row[1] as Long,
+                warehouseName = row[2] as String,
+                available = row[3] as Int,
+                incoming = row[4] as Int,
+                syncedAt = row[5] as Instant,
+            )
+        }
     }
 }
 

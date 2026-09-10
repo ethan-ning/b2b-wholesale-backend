@@ -2,6 +2,7 @@ package com.acme.b2b.application.admin
 
 import com.acme.b2b.application.admin.dto.AdminProductDTO
 import com.acme.b2b.application.admin.dto.TierPriceDTO
+import com.acme.b2b.application.admin.dto.WarehouseStockDTO
 import com.acme.b2b.application.catalog.ProductAssembler
 import com.acme.b2b.application.catalog.SortParser
 import com.acme.b2b.application.catalog.dto.PagedDTO
@@ -33,6 +34,7 @@ class ProductAdminService(
     private val tierPrices: TierPriceRepository,
     private val categories: CategoryRepository,
     private val tiers: CustomerTierRepository,
+    private val stockBreakdown: VariantStockBreakdownRepository,
 ) {
 
     fun list(query: AdminProductQuery): PagedDTO<ProductDTO> {
@@ -65,8 +67,23 @@ class ProductAdminService(
         return AdminProductDTO(
             product = toDto(product, categoryNames()),
             tierPrices = priceBookOf(product),
+            stockByWarehouse = stockOf(product),
         )
     }
+
+    /** Where this product's stock sits. Only assembled for the detail view that shows it. */
+    private fun stockOf(product: Product): List<WarehouseStockDTO> =
+        stockBreakdown.findBySkus(product.variants.map { it.sku.value })
+            .map { line ->
+                WarehouseStockDTO(
+                    sku = line.sku,
+                    warehouseId = line.warehouseId,
+                    warehouseName = line.warehouseName.ifBlank { "Warehouse ${line.warehouseId}" },
+                    available = line.available,
+                    incoming = line.incoming,
+                    syncedAt = line.syncedAt.toString(),
+                )
+            }
 
     @Transactional
     fun update(id: Long, command: UpdateProductCommand): AdminProductDTO {
@@ -108,7 +125,7 @@ class ProductAdminService(
         // back on refusal.
         requireSellableIfVisible(saved)
 
-        return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
+        return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved), stockOf(saved))
     }
 
     /**
@@ -123,7 +140,7 @@ class ProductAdminService(
 
         val visibility = if (active) ProductVisibility.VISIBLE else ProductVisibility.HIDDEN
         if (existing.visibility == visibility) {
-            return AdminProductDTO(toDto(existing, categoryNames()), priceBookOf(existing))
+            return AdminProductDTO(toDto(existing, categoryNames()), priceBookOf(existing), stockOf(existing))
         }
 
         // The product as it would be, not as it is — `existing` is still hidden here, so
@@ -132,7 +149,7 @@ class ProductAdminService(
         requireSellableIfVisible(intended)
 
         val saved = products.save(intended)
-        return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved))
+        return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved), stockOf(saved))
     }
 
     /**

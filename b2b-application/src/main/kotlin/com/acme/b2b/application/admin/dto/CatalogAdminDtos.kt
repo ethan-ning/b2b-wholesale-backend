@@ -3,10 +3,28 @@ package com.acme.b2b.application.admin.dto
 import com.acme.b2b.application.catalog.dto.ProductDTO
 import java.math.BigDecimal
 
-/** A product as the admin sees it: the dealer view plus its price book. */
+/**
+ * A product as the admin sees it: the dealer view, plus the two things kept beside it
+ * rather than on it — what each SKU costs a dealer, and where its stock actually sits.
+ */
 data class AdminProductDTO(
     val product: ProductDTO,
     val tierPrices: List<TierPriceDTO>,
+    val stockByWarehouse: List<WarehouseStockDTO>,
+)
+
+/**
+ * One warehouse's share of one SKU's stock. The variant's own availableStock is these
+ * summed, so a total that looks wrong can be traced to the warehouse it came from.
+ */
+data class WarehouseStockDTO(
+    val sku: String,
+    val warehouseId: Long,
+    val warehouseName: String,
+    val available: Int,
+    /** In transit to this warehouse — Sellfox's 在途. */
+    val incoming: Int,
+    val syncedAt: String,
 )
 
 /**

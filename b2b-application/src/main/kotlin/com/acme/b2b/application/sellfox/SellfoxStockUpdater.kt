@@ -2,6 +2,7 @@ package com.acme.b2b.application.sellfox
 
 import com.acme.b2b.domain.catalog.ProductStockRepository
 import com.acme.b2b.domain.catalog.SkuStockUpdate
+import com.acme.b2b.domain.catalog.WarehouseStock
 import com.acme.b2b.domain.sellfox.SellfoxInventoryPort
 import com.acme.b2b.domain.sellfox.SellfoxScopeRepository
 import com.acme.b2b.domain.sellfox.SyncCounts
@@ -11,10 +12,10 @@ import java.time.Instant
 /**
  * Reads stock for the warehouses in scope and sums it per SKU.
  *
- * A variant carries one available figure and a dealer only asks whether it can ship;
- * which warehouse it ships from is a fulfilment concern the portal does not surface.
- * Summing over the *selected* warehouses is what keeps stock that cannot reach a US
- * dealer out of the number they see.
+ * A variant carries one available figure, because a dealer only asks whether it can ship.
+ * Summing over the *selected* warehouses is what keeps stock that cannot reach a US dealer
+ * out of the number they see. The rows behind the sum are kept too — an admin asking why
+ * a total looks wrong needs to see where it came from.
  */
 @Component
 class SellfoxStockUpdater(
@@ -36,10 +37,14 @@ class SellfoxStockUpdater(
         warehouseIds.forEach { warehouseId ->
             val rows = sellfox.listStock(warehouseId)
             counts.read(rows.size)
-            rows.forEach { row -> totals.getOrPut(row.sku) { Totals() }.add(row.available, row.incoming) }
+            rows.forEach { row ->
+                totals.getOrPut(row.sku) { Totals() }.add(warehouseId, row.available, row.incoming)
+            }
         }
 
-        val matched = stock.applyStock(totals.map { (sku, t) -> SkuStockUpdate(sku, t.available, t.incoming, now) })
+        val matched = stock.applyStock(
+            totals.map { (sku, t) -> SkuStockUpdate(sku, t.available, t.incoming, now, t.byWarehouse) }
+        )
         counts.wrote(matched)
         // Sellfox holds far more SKUs than the portal carries; the rest are not errors,
         // they are simply out of catalog.
@@ -52,10 +57,15 @@ class SellfoxStockUpdater(
     private class Totals {
         var available = 0; private set
         var incoming = 0; private set
+        val byWarehouse = mutableListOf<WarehouseStock>()
 
-        fun add(available: Int, incoming: Int) {
+        fun add(warehouseId: Long, available: Int, incoming: Int) {
             this.available += available
             this.incoming += incoming
+            // Only warehouses Sellfox reported the SKU in. It returns no row for a
+            // warehouse that has never held it, so an absent warehouse means "not stocked
+            // here" rather than "zero here", and inventing the zero row would blur the two.
+            byWarehouse += WarehouseStock(warehouseId, available, incoming)
         }
     }
 }
