@@ -92,6 +92,16 @@ jobs:
       - name: Deploy
         run: |
           SQL="$PROJECT_ID:$REGION:${{ vars.GCP_SQL_INSTANCE }}"
+          # The origin the portal is served from. Browsers send Origin on POST even
+          # same-origin, so getting this wrong fails every sign-in with 403 while every
+          # page still loads — a failure that looks like a bad password. Refuse to deploy
+          # rather than ship that: an empty list rejects everyone.
+          ORIGINS="${{ vars.PUBLIC_ORIGIN }}"
+          if [ -z "$ORIGINS" ]; then
+            echo "PUBLIC_ORIGIN is not set. Add it as a repository variable, e.g."
+            echo "  PUBLIC_ORIGIN = https://portal.example.com"
+            exit 1
+          fi
           gcloud run deploy "$SERVICE" \
             --image="$REGION-docker.pkg.dev/$PROJECT_ID/b2b/$SERVICE:$GITHUB_SHA" \
             --region="$REGION" \
@@ -100,7 +110,7 @@ jobs:
             --min-instances=1 --no-cpu-throttling \
             --memory=1Gi --cpu=1 --timeout=300 \
             --vpc-egress=all-traffic --network=b2b --subnet=b2b \
-            --set-env-vars="^@^DB_URL=jdbc:postgresql:///b2b?cloudSqlInstance=$SQL&socketFactory=com.google.cloud.sql.postgres.SocketFactory@DB_USER=b2b@SELLFOX_SCHEDULE_ENABLED=true" \
+            --set-env-vars="^@^DB_URL=jdbc:postgresql:///b2b?cloudSqlInstance=$SQL&socketFactory=com.google.cloud.sql.postgres.SocketFactory@DB_USER=b2b@SELLFOX_SCHEDULE_ENABLED=true@APP_CORS_ALLOWED_ORIGINS=$ORIGINS" \
             --set-secrets="DB_PASSWORD=b2b-db-password:latest,JWT_SECRET=b2b-jwt-secret:latest,SELLFOX_APP_ID=sellfox-app-id:latest,SELLFOX_APP_SECRET=sellfox-app-secret:latest"
 
       - name: Check it answers

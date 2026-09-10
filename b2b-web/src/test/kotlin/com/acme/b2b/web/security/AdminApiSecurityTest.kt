@@ -101,6 +101,36 @@ class AdminApiSecurityTest {
             .andExpect(jsonPath("$.admin.role").value("SUPER_ADMIN"))
     }
 
+    /**
+     * Browsers send Origin on POST even same-origin, so an origin the server does not know
+     * is refused by the CORS filter before any controller runs — 403, not the 401 a wrong
+     * password gives. Curl sends no Origin, which is how this passed every test and every
+     * manual check while failing every actual sign-in.
+     */
+    @Test
+    fun `a sign-in from a configured origin is not blocked`() {
+        whenever(adminAuth.login(any())).thenReturn(
+            AdminLoginResponse("a-token", AdminUserDTO(1, "admin@example.com", "System Admin", "SUPER_ADMIN"))
+        )
+
+        mockMvc.perform(
+            post("/api/admin/auth/login")
+                .header("Origin", "http://localhost:5173")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"admin@example.com","password":"admin123"}""")
+        ).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `a sign-in from an unconfigured origin is refused by CORS, not by the password check`() {
+        mockMvc.perform(
+            post("/api/admin/auth/login")
+                .header("Origin", "https://not-configured.example.com")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"admin@example.com","password":"admin123"}""")
+        ).andExpect(status().isForbidden)
+    }
+
     @Test
     fun `admin routes reject an anonymous request`() {
         mockMvc.perform(get("/api/admin/customers")).andExpect(status().isUnauthorized)

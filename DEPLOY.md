@@ -152,6 +152,13 @@ Then in **github.com → b2b-wholesale-backend → Settings → Secrets and vari
 | `GCP_WIF_PROVIDER` | the `projects/.../providers/github` line printed above |
 | `GCP_DEPLOY_SA` | `github-deploy@…iam.gserviceaccount.com` |
 | `GCP_SQL_INSTANCE` | `b2b` |
+| `PUBLIC_ORIGIN` | `https://<your domain>` — scheme and host, no trailing slash |
+
+`PUBLIC_ORIGIN` is the origin the portal is served from, and the deploy refuses to run
+without it. Browsers attach `Origin` to a POST even when the page came from the same host,
+so an origin the server does not recognise is refused by the CORS filter before the
+controller runs — every sign-in returns 403 while every page still loads, which reads as a
+wrong password rather than a configuration error.
 
 These are variables, not secrets — none of them is one, and a project id in a log is
 easier to debug than a masked string.

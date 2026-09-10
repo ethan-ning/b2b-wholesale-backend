@@ -1,5 +1,6 @@
 package com.acme.b2b.web.security
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
@@ -26,7 +27,16 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
  */
 @Configuration
 @EnableWebSecurity
-class WebSecurityConfig {
+class WebSecurityConfig(
+    /**
+     * Origins allowed to call /api. The Vite dev server by default; deployments add their
+     * own, because a browser sends Origin on POST even when the page came from the same
+     * host — so an origin missing here fails every form submission with 403 while GETs,
+     * which carry no Origin, keep working and hide it.
+     */
+    @Value("\${app.cors.allowed-origins:http://localhost:5173}")
+    private val allowedOrigins: List<String>,
+) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity, jwtDecoder: JwtDecoder): SecurityFilterChain =
@@ -75,13 +85,12 @@ class WebSecurityConfig {
             )
         }
 
-    /** The Vite dev server, so the portal can run against a local backend. */
     private fun corsConfigurationSource(): CorsConfigurationSource =
         UrlBasedCorsConfigurationSource().apply {
             registerCorsConfiguration(
                 "/api/**",
                 CorsConfiguration().apply {
-                    allowedOrigins = listOf("http://localhost:5173")
+                    allowedOrigins = this@WebSecurityConfig.allowedOrigins
                     allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
                     allowedHeaders = listOf("*")
                 },
