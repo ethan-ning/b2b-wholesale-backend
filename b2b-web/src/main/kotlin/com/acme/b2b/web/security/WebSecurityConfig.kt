@@ -56,9 +56,12 @@ class WebSecurityConfig(
                     // Nothing is given away: these serve the same index.html to everyone,
                     // and every byte of data behind them still comes from /api, which is
                     // not on this list.
+                    // /assets/** is what the bundler emits; /brand/** is what it copies
+                    // through untouched. A logo behind a 401 renders as a broken image on
+                    // the sign-in page, which is the one page nobody has a token for yet.
                     .requestMatchers(
                         HttpMethod.GET,
-                        "/", "/index.html", "/favicon.svg", "/assets/**",
+                        "/", "/index.html", "/favicon.svg", "/assets/**", "/brand/**",
                         "/login", "/change-password", "/search", "/products/**", "/admin/**",
                     ).permitAll()
                     // A dealer still on an admin-issued password holds a token whose only

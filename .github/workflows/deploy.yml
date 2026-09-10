@@ -116,7 +116,25 @@ jobs:
       - name: Check it answers
         run: |
           URL="$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"
+
+          # Cloud Run reports the revision ready once the container holds the port, which
+          # a Spring Boot app does before its health indicators agree it is up — so the
+          # first request after a deploy can legitimately be a 503. Poll rather than fail
+          # the release on a race we already know about.
+          for attempt in $(seq 1 30); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL/actuator/health" || true)"
+            [ "$code" = "200" ] && break
+            echo "health: $code (attempt $attempt)"
+            sleep 5
+          done
+          if [ "$code" != "200" ]; then
+            echo "Health never reached 200 — last status $code"
+            exit 1
+          fi
+
           # Both halves, because the image carries both and either can break alone.
-          curl -fsS "$URL/actuator/health" > /dev/null
           curl -fsS -o /dev/null "$URL/admin/login"
+          # The brand images live outside the bundler's output directory, so they are
+          # covered by their own rule. A 401 here means that rule went missing again.
+          curl -fsS -o /dev/null "$URL/brand/logo-horizontal.png"
           echo "Deployed: $URL"

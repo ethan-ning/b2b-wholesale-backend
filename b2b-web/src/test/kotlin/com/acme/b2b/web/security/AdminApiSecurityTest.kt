@@ -133,6 +133,22 @@ class AdminApiSecurityTest {
         ).andExpect(status().isForbidden)
     }
 
+    // Every static path the sign-in pages need before anyone has a token. The brand
+    // images ship in their own directory rather than the bundler's, so the rule covering
+    // bundled assets did not reach them and they 401'd in production — on the one page a
+    // visitor gets to without credentials.
+    //
+    // Line comments, not a KDoc block: Kotlin nests block comments, and a wildcard path
+    // written out in full closes with a slash-star that opens one.
+    @Test
+    fun `the portal's own static files are reachable without a token`() {
+        listOf("/favicon.svg", "/assets/index.js", "/brand/logo-horizontal.png", "/brand/hero.jpg")
+            .forEach { path ->
+                mockMvc.perform(get(path))
+                    .andExpect(status().isNotFound)  // permitted, then simply not present in a unit test
+            }
+    }
+
     @Test
     fun `admin routes reject an anonymous request`() {
         mockMvc.perform(get("/api/admin/customers")).andExpect(status().isUnauthorized)
