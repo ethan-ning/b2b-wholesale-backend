@@ -178,8 +178,13 @@ developer defaults.
 ```
 
 The portal is packaged into the same image and served from the same origin, so there is
-one artifact to deploy and nothing is cross-origin. See [DEPLOY.md](DEPLOY.md) for Cloud
-Run — including the two flags the background sync depends on.
+one artifact to deploy and nothing is cross-origin.
+
+Pushing to `master` deploys: `.github/workflows/deploy.yml` runs the whole suite, builds
+the image and rolls it out to Cloud Run, authenticating with no stored key. The portal's
+repository checks itself and then asks this one to deploy the commit it just pushed.
+[DEPLOY.md](DEPLOY.md) is the runbook for setting that up — including the two flags the
+background sync depends on.
 
 Two things the local seed does that production must do deliberately:
 

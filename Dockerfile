@@ -5,8 +5,7 @@
 # no proxy hop, and one thing to roll back when a release is wrong.
 #
 # The portal is a separate repository, so its build output is expected at ./frontend-dist.
-# `./build-image.sh` puts it there; cloudbuild.yaml does the same in CI. Building without
-# it still works — the API runs, and app.serve-spa stays off.
+# `./build-image.sh` puts it there; the deploy workflow does the same in CI.
 
 FROM eclipse-temurin:21-jdk AS api
 WORKDIR /src

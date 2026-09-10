@@ -1,0 +1,112 @@
+# Test, build and deploy to Cloud Run.
+#
+# Authentication is keyless: Workload Identity Federation lets this repository exchange
+# GitHub's own OIDC token for short-lived Google credentials, so there is no service
+# account JSON key to store, rotate or leak. See DEPLOY.md for the one-time setup.
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  # The portal is a separate repository; its workflow sends one of these when it changes.
+  repository_dispatch:
+    types: [portal-updated]
+  workflow_dispatch:
+    inputs:
+      portal_ref:
+        description: Portal ref to build (branch, tag or SHA)
+        default: main
+
+concurrency:
+  # One deploy at a time, and a newer commit supersedes one still waiting. Cancelling
+  # in progress is deliberately off: a half-finished deploy is worse than a slow one.
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: ${{ vars.GCP_REGION }}
+  SERVICE: b2b-wholesale
+  PORTAL_REPO: ethan-ning/b2b-wholesale-frontend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      # Runners have Docker, so this is the whole suite: unit tests and the Postgres-backed
+      # integration tests. A deploy that skipped the ones needing a database would be
+      # skipping the tests that found the last three bugs.
+      - run: ./gradlew build --no-daemon
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write        # required to mint the OIDC token for Google
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the portal
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PORTAL_REPO }}
+          ref: ${{ github.event.client_payload.ref || inputs.portal_ref || 'main' }}
+          path: portal
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal/package-lock.json
+
+      - name: Build the portal
+        working-directory: portal
+        run: |
+          npm ci
+          npm run build          # tsc runs first, so a type error stops the deploy
+          cp -R dist "$GITHUB_WORKSPACE/frontend-dist"
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push
+        run: |
+          IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/b2b/$SERVICE"
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker build -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy
+        run: |
+          SQL="$PROJECT_ID:$REGION:${{ vars.GCP_SQL_INSTANCE }}"
+          gcloud run deploy "$SERVICE" \
+            --image="$REGION-docker.pkg.dev/$PROJECT_ID/b2b/$SERVICE:$GITHUB_SHA" \
+            --region="$REGION" \
+            --allow-unauthenticated \
+            --add-cloudsql-instances="$SQL" \
+            --min-instances=1 --no-cpu-throttling \
+            --memory=1Gi --cpu=1 --timeout=300 \
+            --vpc-egress=all-traffic --network=b2b --subnet=b2b \
+            --set-env-vars="^@^DB_URL=jdbc:postgresql:///b2b?cloudSqlInstance=$SQL&socketFactory=com.google.cloud.sql.postgres.SocketFactory@DB_USER=b2b@SELLFOX_SCHEDULE_ENABLED=true" \
+            --set-secrets="DB_PASSWORD=b2b-db-password:latest,JWT_SECRET=b2b-jwt-secret:latest,SELLFOX_APP_ID=sellfox-app-id:latest,SELLFOX_APP_SECRET=sellfox-app-secret:latest"
+
+      - name: Check it answers
+        run: |
+          URL="$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"
+          # Both halves, because the image carries both and either can break alone.
+          curl -fsS "$URL/actuator/health" > /dev/null
+          curl -fsS -o /dev/null "$URL/admin/login"
+          echo "Deployed: $URL"
