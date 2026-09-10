@@ -59,23 +59,49 @@ a migration edited after being applied elsewhere is a deployment accident.
 ## Test it
 
 ```bash
-./gradlew test    # 107 tests, no Docker or network required
-./gradlew build   # test + the layering guards below
+./gradlew test              # 160 unit tests. No Docker, no network.
+./gradlew integrationTest   # 16 tests against a real Postgres. Needs Docker.
+./gradlew build             # both, plus the layering guards below
+./gradlew jacocoTestReport  # coverage, per module, under build/reports/jacoco
 ```
 
-Everything is a unit test. The domain and types modules are pure Kotlin; the application
-tests drive use cases against in-memory fakes; the web tests are `@WebMvcTest` slices with
-mocked services. Nothing touches Postgres or Sellfox, so `./gradlew test` runs on a plane.
+The two are separate tasks on purpose. Unit tests must run anywhere — on a plane, in a
+pre-commit hook — and the moment a Postgres-backed test shares the `test` task nobody can
+tell which kind failed.
+
+### Unit tests
+
+The domain and types modules are pure Kotlin; the application tests drive use cases
+against hand-written in-memory fakes rather than mocks, so they exercise behaviour rather
+than call sequences; the web tests are `@WebMvcTest` slices. Nothing touches Postgres or
+Sellfox.
 
 | Module | Tests | What they cover |
 |---|---|---|
 | `b2b-types` | 14 | SKU and SPU code shapes, money arithmetic, email |
 | `b2b-domain` | 57 | Product invariants, tier pricing, SPU grouping, sync run states |
-| `b2b-application` | 26 | Category depth and delete rules, customer admin, auth, sorting |
+| `b2b-application` | 79 | The pricing guard, dealer auth, the whole sync, categories, customers |
 | `b2b-web` | 10 | That admin endpoints reject dealer tokens and anonymous callers |
 
-`SpuGroupingTest` is the one to read first if you are changing how SKUs collapse into
-products — it is the most intricate logic here and the tests double as its specification.
+Two to read first. `SpuGroupingTest` is the most intricate logic here and doubles as its
+specification. `ProductAdminServiceTest` covers the rule that costs money if it breaks: a
+product no dealer could buy from must not be visible, enforced on both routes that can set
+visibility.
+
+### Integration tests
+
+`b2b-infrastructure/src/integrationTest` runs against a real Postgres in a container, with
+the real migration and the real mappings — `ddl-auto: validate` means the context does not
+even start unless every entity matches the table Flyway created.
+
+They exist for the things a fake cannot be wrong about in the same way: whether a cascade
+fires, whether a flush ordering behaves as assumed, whether a collection Hibernate is
+holding still matches the database. Two live bugs turned up when they were first written,
+both of which only appear once the sync runs inside a single transaction.
+
+Docker discovery is automatic. Testcontainers looks for `/var/run/docker.sock`, which is
+not where Colima, Rancher or a rootless daemon put it, so the task asks the active Docker
+context and passes the answer through. Nothing to export.
 
 ### The layering guards
 

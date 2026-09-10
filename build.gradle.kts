@@ -29,6 +29,13 @@ subprojects {
     }
 
     tasks.withType<Test>().configureEach { useJUnitPlatform() }
+
+    // Coverage, so "improve the tests" can be aimed rather than guessed at.
+    apply(plugin = "jacoco")
+    tasks.named<JacocoReport>("jacocoTestReport") {
+        dependsOn(tasks.named("test"))
+        reports { xml.required.set(true); html.required.set(true) }
+    }
 }
 
 /**

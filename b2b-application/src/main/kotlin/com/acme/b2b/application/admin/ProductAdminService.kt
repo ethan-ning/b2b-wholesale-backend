@@ -64,12 +64,21 @@ class ProductAdminService(
 
     fun findById(id: Long): AdminProductDTO? {
         val product = products.findById(id) ?: return null
-        return AdminProductDTO(
-            product = toDto(product, categoryNames()),
-            tierPrices = priceBookOf(product),
-            stockByWarehouse = stockOf(product),
-        )
+        return detailOf(product)
     }
+
+    /**
+     * The detail response, including whether the product could be sold at all.
+     *
+     * The list computed that and this did not, so the edit form — the one screen that can
+     * do something about it — was the only place that could not tell an unpriced product
+     * from a priced one.
+     */
+    private fun detailOf(product: Product) = AdminProductDTO(
+        product = toDto(product, categoryNames(), sellable = product.isSellable(pricedSkusOf(product))),
+        tierPrices = priceBookOf(product),
+        stockByWarehouse = stockOf(product),
+    )
 
     /** Where this product's stock sits. Only assembled for the detail view that shows it. */
     private fun stockOf(product: Product): List<WarehouseStockDTO> =
@@ -125,7 +134,7 @@ class ProductAdminService(
         // back on refusal.
         requireSellableIfVisible(saved)
 
-        return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved), stockOf(saved))
+        return detailOf(saved)
     }
 
     /**
@@ -140,7 +149,7 @@ class ProductAdminService(
 
         val visibility = if (active) ProductVisibility.VISIBLE else ProductVisibility.HIDDEN
         if (existing.visibility == visibility) {
-            return AdminProductDTO(toDto(existing, categoryNames()), priceBookOf(existing), stockOf(existing))
+            return detailOf(existing)
         }
 
         // The product as it would be, not as it is — `existing` is still hidden here, so
@@ -149,7 +158,7 @@ class ProductAdminService(
         requireSellableIfVisible(intended)
 
         val saved = products.save(intended)
-        return AdminProductDTO(toDto(saved, categoryNames()), priceBookOf(saved), stockOf(saved))
+        return detailOf(saved)
     }
 
     /**

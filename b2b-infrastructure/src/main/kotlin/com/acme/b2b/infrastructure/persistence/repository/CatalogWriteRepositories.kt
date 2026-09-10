@@ -16,6 +16,7 @@ import com.acme.b2b.infrastructure.persistence.jpa.ProductJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.VariantWarehouseStockJpaRepository
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 /**
@@ -29,6 +30,7 @@ class ProductStockRepositoryImpl(
     private val warehouseStock: VariantWarehouseStockJpaRepository,
 ) : ProductStockRepository {
 
+    @Transactional
     override fun applyStock(updates: List<SkuStockUpdate>): Int {
         if (updates.isEmpty()) return 0
         val bySku = updates.associateBy { it.sku }
@@ -96,6 +98,19 @@ class ProductGroupingRepositoryImpl(
     private val variants: ProductVariantJpaRepository,
 ) : ProductGroupingRepository {
 
+    /**
+     * One transaction, deliberately.
+     *
+     * A regroup is several writes that only make sense together — a SKU reparented, its
+     * old shell removed, SKUs nobody placed withdrawn. Half of it applied is a catalogue
+     * with variants pointing at products that are gone.
+     *
+     * Being explicit also settles which persistence context these run in. Left to the
+     * caller, each repository call got its own, and the code's assumptions about what a
+     * loaded collection contains were true only by accident of that. Two of them were
+     * wrong the moment anything wrapped this in a transaction; see the integration tests.
+     */
+    @Transactional
     override fun regroup(families: List<RegroupedFamily>): RegroupOutcome {
         val bySpu = products.findBySourceIn(listOf(SELLFOX)).associateBy { it.spuCode }.toMutableMap()
         val existingRows = variants
@@ -152,8 +167,9 @@ class ProductGroupingRepositoryImpl(
         withdrawn.forEach { it.status = DISCONTINUED }
         variants.saveAll(withdrawn)
 
-        val emptied = products.findBySourceIn(listOf(SELLFOX)).filter { it.variants.isEmpty() }
-        products.deleteAll(emptied)
+        val stillHolding = variants.productIdsHoldingSkus(SELLFOX).toSet()
+        val emptied = products.findBySourceIn(listOf(SELLFOX)).mapNotNull { it.id }.filterNot { it in stillHolding }
+        if (emptied.isNotEmpty()) products.deleteByIdIn(emptied)
 
         return RegroupOutcome(
             productsCreated = productsCreated,
@@ -164,6 +180,7 @@ class ProductGroupingRepositoryImpl(
         )
     }
 
+    @Transactional
     override fun deactivateProductsNotIn(spuCodes: Set<String>): Int {
         val stale = products
             .findBySourceAndVisibility(SELLFOX, ProductVisibility.VISIBLE.name)

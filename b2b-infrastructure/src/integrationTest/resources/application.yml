@@ -1,0 +1,20 @@
+# Integration tests run the real migration against a real Postgres, so Flyway owns the
+# schema here exactly as it does in production and Hibernate only validates against it.
+# Anything else would test a schema this project never ships.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN

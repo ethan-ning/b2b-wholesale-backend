@@ -9,6 +9,8 @@ import com.acme.b2b.domain.common.Page
 import com.acme.b2b.domain.common.PageOf
 import com.acme.b2b.domain.catalog.*
 import com.acme.b2b.domain.customer.*
+import com.acme.b2b.domain.pricing.TierPrice
+import com.acme.b2b.domain.pricing.TierPriceRepository
 import com.acme.b2b.types.*
 
 /**
@@ -170,4 +172,29 @@ class InMemoryProductRepository(seed: List<Product> = emptyList()) : ProductRepo
     override fun search(criteria: ProductSearchCriteria, page: Page) = throw NotImplementedError()
     override fun countAll() = rows.size.toLong()
     override fun countByVisibility(visibility: ProductVisibility) = rows.values.count { it.visibility == visibility }.toLong()
+}
+
+class InMemoryTierPriceRepository(seed: List<TierPrice> = emptyList()) : TierPriceRepository {
+    private val rows = mutableListOf<TierPrice>()
+
+    init { rows += seed }
+
+    val all: List<TierPrice> get() = rows.toList()
+
+    override fun findAllFor(skus: Collection<SkuCode>) = rows.filter { it.sku in skus }
+
+    override fun findFor(skus: Collection<SkuCode>, tierId: TierId) =
+        rows.filter { it.sku in skus && it.tierId == tierId }
+
+    override fun replaceFor(sku: SkuCode, prices: List<TierPrice>) {
+        rows.removeAll { it.sku == sku }
+        rows += prices
+    }
+}
+
+/** Where stock sits, for the one admin view that asks. Empty unless a test seeds it. */
+class InMemoryStockBreakdownRepository(
+    private val lines: List<WarehouseStockLine> = emptyList(),
+) : VariantStockBreakdownRepository {
+    override fun findBySkus(skus: List<String>) = lines.filter { it.sku in skus }
 }
