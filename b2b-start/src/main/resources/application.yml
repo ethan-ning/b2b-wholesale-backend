@@ -45,9 +45,14 @@ sellfox:
   client-id: ${SELLFOX_APP_ID}
   client-secret: ${SELLFOX_APP_SECRET}
   request-timeout-seconds: ${SELLFOX_TIMEOUT_SECONDS:60}
+  # How long a RUNNING row must have sat there before startup calls it dead. Only has to
+  # exceed the longest legitimate run; a full sync pages the catalogue in a couple of
+  # minutes. Too short and a starting instance would close a live run on another one.
+  run-stale-after: ${SELLFOX_RUN_STALE_AFTER:PT15M}
   schedule:
-    # Off unless asked for. A second instance running the same cron would double every
-    # sync, so enabling it is a deployment decision rather than a default.
+    # Off unless asked for. Safe on several instances now — the database allows one run at
+    # a time — but it needs an instance alive with CPU when the cron fires, which a
+    # scale-to-zero platform does not promise. See the README.
     enabled: ${SELLFOX_SCHEDULE_ENABLED:false}
     # Stock, hourly at five past. Reads only the selected warehouses.
     inventory-cron: ${SELLFOX_INVENTORY_CRON:0 5 * * * *}

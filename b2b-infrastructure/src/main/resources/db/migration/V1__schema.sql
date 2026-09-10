@@ -226,4 +226,11 @@ CREATE TABLE sellfox_sync_run (
     summary          TEXT
 );
 CREATE INDEX idx_sellfox_run_started ON sellfox_sync_run (started_at DESC);
+
+-- At most one run in flight, enforced here rather than by asking first.
+--
+-- Reading "is one running?" and then inserting is two steps, and two instances — or two
+-- admins on one instance — can both read false. This makes the second insert fail instead,
+-- which is a race the database settles rather than one the application hopes to win.
+CREATE UNIQUE INDEX one_running_sync ON sellfox_sync_run ((TRUE)) WHERE status = 'RUNNING';
 CREATE INDEX idx_sellfox_run_mode ON sellfox_sync_run (mode, started_at DESC);

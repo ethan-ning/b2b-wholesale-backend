@@ -14,6 +14,7 @@ import com.acme.b2b.domain.sellfox.SellfoxScopeRepository
 import com.acme.b2b.domain.sellfox.SellfoxSkuLink
 import com.acme.b2b.domain.sellfox.SellfoxSkuLinkRepository
 import com.acme.b2b.domain.sellfox.SellfoxStock
+import com.acme.b2b.domain.sellfox.RunStatus
 import com.acme.b2b.domain.sellfox.SellfoxSyncRun
 import com.acme.b2b.domain.sellfox.SellfoxSyncRunRepository
 import com.acme.b2b.domain.sellfox.SellfoxWarehouse
@@ -149,7 +150,13 @@ class InMemorySyncRunRepository : SellfoxSyncRunRepository {
         return stored
     }
 
+    /** Stands in for the partial unique index: at most one RUNNING row. */
+    override fun startExclusively(run: SellfoxSyncRun): SellfoxSyncRun? {
+        if (running || rows.any { it.status == RunStatus.RUNNING }) return null
+        return save(run)
+    }
+
     override fun recent(limit: Int) = rows.sortedByDescending { it.startedAt }.take(limit)
-    override fun isRunning() = running
-    override fun failInterrupted(reason: String, at: Instant) = 0
+    override fun isRunning() = running || rows.any { it.status == RunStatus.RUNNING }
+    override fun failInterrupted(reason: String, at: Instant, startedBefore: Instant) = 0
 }

@@ -31,11 +31,10 @@ class SyncRunner(
         triggeredBy: String?,
         work: (SyncCounts) -> String,
     ): SellfoxSyncRun {
-        if (runs.isRunning()) {
-            throw UseCaseViolation("A sync is already running")
-        }
-
+        // The insert is the guard, not a check before it: two instances asking first would
+        // both be told no run is going.
         val started = begin(mode, trigger, triggeredBy)
+            ?: throw UseCaseViolation("A sync is already running")
         val counts = SyncCounts()
 
         return try {
@@ -48,8 +47,8 @@ class SyncRunner(
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun begin(mode: SyncMode, trigger: TriggerSource, triggeredBy: String?): SellfoxSyncRun =
-        runs.save(SellfoxSyncRun.started(mode, trigger, triggeredBy, clock.instant()))
+    fun begin(mode: SyncMode, trigger: TriggerSource, triggeredBy: String?): SellfoxSyncRun? =
+        runs.startExclusively(SellfoxSyncRun.started(mode, trigger, triggeredBy, clock.instant()))
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun finish(run: SellfoxSyncRun): SellfoxSyncRun = runs.save(run)

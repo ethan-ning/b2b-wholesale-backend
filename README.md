@@ -163,6 +163,7 @@ genuinely differs.
 | `JWT_TTL_MINUTES` | 480 | |
 | `SELLFOX_APP_ID` `SELLFOX_APP_SECRET` | empty | Sync fails without them; the app still runs |
 | `SELLFOX_SCHEDULE_ENABLED` | `false` | Cron off locally and by default in production |
+| `SELLFOX_RUN_STALE_AFTER` | `PT15M` | How old a RUNNING row must be before startup declares it dead |
 | `SERVER_PORT` | 8080 | |
 
 ## Deploying
@@ -181,8 +182,12 @@ Two things the local seed does that production must do deliberately:
   never puts on the Flyway path — a migration that seeds a known password would run
   everywhere, and this repository is public. Insert your first admin explicitly at deploy
   time, with a BCrypt hash you generated.
-- **The cron.** Set `SELLFOX_SCHEDULE_ENABLED=true` on exactly one instance. Two instances
-  running the same schedule double every sync.
+- **The cron.** Set `SELLFOX_SCHEDULE_ENABLED=true` where you want it. It is safe to leave
+  on across several instances — the database allows one RUNNING row at a time, so the
+  others are simply turned away — but a scaled-to-zero platform will not fire it at all,
+  and background work needs CPU allocated outside a request. On Cloud Run that means
+  `--min-instances=1 --no-cpu-throttling`, or moving the trigger to Cloud Scheduler
+  calling `POST /api/admin/sellfox/runs`.
 
 ## API shape
 

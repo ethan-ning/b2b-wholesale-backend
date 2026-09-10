@@ -10,6 +10,7 @@ import com.acme.b2b.infrastructure.persistence.jpa.SellfoxSkuLinkJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.SellfoxSyncRunJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.SellfoxWarehouseJpaRepository
 import org.springframework.data.domain.PageRequest
+import jakarta.persistence.EntityManager
 import org.springframework.stereotype.Repository
 import java.time.Instant
 
@@ -139,22 +140,25 @@ class SellfoxSkuLinkRepositoryImpl(
 @Repository
 class SellfoxSyncRunRepositoryImpl(
     private val jpa: SellfoxSyncRunJpaRepository,
+    private val em: EntityManager,
 ) : SellfoxSyncRunRepository {
 
-    override fun save(run: SellfoxSyncRun): SellfoxSyncRun {
-        val row = run.id?.let { jpa.findById(it).orElse(null) } ?: SellfoxSyncRunDO()
-        row.mode = run.mode.name
-        row.triggerSource = run.trigger.name
-        row.status = run.status.name
-        row.triggeredBy = run.triggeredBy
-        row.startedAt = run.startedAt
-        row.finishedAt = run.finishedAt
-        row.recordsRead = run.recordsRead
-        row.recordsWritten = run.recordsWritten
-        row.recordsSkipped = run.recordsSkipped
-        row.errorMessage = run.errorMessage
-        row.summary = run.summary
-        return jpa.save(row).toDomain()
+    override fun save(run: SellfoxSyncRun): SellfoxSyncRun = jpa.save(run.toRow()).toDomain()
+
+    private fun SellfoxSyncRun.toRow(): SellfoxSyncRunDO {
+        val row = id?.let { jpa.findById(it).orElse(null) } ?: SellfoxSyncRunDO()
+        row.mode = mode.name
+        row.triggerSource = trigger.name
+        row.status = status.name
+        row.triggeredBy = triggeredBy
+        row.startedAt = startedAt
+        row.finishedAt = finishedAt
+        row.recordsRead = recordsRead
+        row.recordsWritten = recordsWritten
+        row.recordsSkipped = recordsSkipped
+        row.errorMessage = errorMessage
+        row.summary = summary
+        return row
     }
 
     override fun recent(limit: Int): List<SellfoxSyncRun> =
@@ -162,8 +166,38 @@ class SellfoxSyncRunRepositoryImpl(
 
     override fun isRunning(): Boolean = jpa.existsByStatus(RunStatus.RUNNING.name)
 
-    override fun failInterrupted(reason: String, at: Instant): Int {
-        val stale = jpa.findByStatus(RunStatus.RUNNING.name)
+    /**
+     * Lets the database decide, and asks it in a way that can be turned down.
+     *
+     * ON CONFLICT rather than catching the violation: a failed constraint aborts the
+     * Postgres transaction, so a caught exception leaves nothing usable to carry on with —
+     * including the read that would report what happened. DO NOTHING returns no row
+     * instead, and the transaction survives to be told about it.
+     *
+     * The conflict target repeats `one_running_sync`'s definition because that is how
+     * Postgres identifies a partial index.
+     */
+    override fun startExclusively(run: SellfoxSyncRun): SellfoxSyncRun? {
+        val id = em.createNativeQuery(
+            """
+            INSERT INTO sellfox_sync_run (mode, trigger_source, status, triggered_by, started_at)
+            VALUES (?1, ?2, 'RUNNING', ?3, ?4)
+            ON CONFLICT ((TRUE)) WHERE status = 'RUNNING' DO NOTHING
+            RETURNING id
+            """
+        )
+            .setParameter(1, run.mode.name)
+            .setParameter(2, run.trigger.name)
+            .setParameter(3, run.triggeredBy)
+            .setParameter(4, run.startedAt)
+            .resultList
+            .firstOrNull() as Number? ?: return null
+
+        return run.copy(id = id.toLong())
+    }
+
+    override fun failInterrupted(reason: String, at: Instant, startedBefore: Instant): Int {
+        val stale = jpa.findByStatusAndStartedAtBefore(RunStatus.RUNNING.name, startedBefore)
         stale.forEach { row ->
             row.status = RunStatus.FAILED.name
             row.finishedAt = at

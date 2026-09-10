@@ -171,4 +171,5 @@ interface SellfoxSyncRunJpaRepository : JpaRepository<SellfoxSyncRunDO, Long> {
     fun findAllByOrderByStartedAtDesc(pageable: Pageable): List<SellfoxSyncRunDO>
     fun existsByStatus(status: String): Boolean
     fun findByStatus(status: String): List<SellfoxSyncRunDO>
+    fun findByStatusAndStartedAtBefore(status: String, startedAt: java.time.Instant): List<SellfoxSyncRunDO>
 }
