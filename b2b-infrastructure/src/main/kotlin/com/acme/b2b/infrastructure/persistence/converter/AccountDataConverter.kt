@@ -41,6 +41,18 @@ class AccountDataConverter {
      * written only on creation: changing it is an identity change with its own use case,
      * and letting a profile edit through here would make that silently possible.
      */
+    /** Email is identity: set once, on insert. Changing it is a different use case. */
+    fun applyTo(row: AdminUserDO, admin: AdminUser): AdminUserDO {
+        if (row.id == null) {
+            row.email = admin.email.value
+            row.createdAt = Instant.now()
+        }
+        row.passwordHash = admin.passwordHash.value
+        row.name = admin.name
+        row.role = admin.role.name
+        return row
+    }
+
     fun applyTo(row: CustomerDO, customer: Customer): CustomerDO {
         if (row.id == null) {
             row.email = customer.email.value

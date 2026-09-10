@@ -17,8 +17,15 @@ class AdminUser(
 ) {
     init { require(name.isNotBlank()) { "Admin name must not be blank" } }
 
-    /** Only a super admin may create or modify other admins. */
+    /** Only a super admin may create or remove other admins. */
     val canManageAdmins: Boolean get() = role == AdminRole.SUPER_ADMIN
+
+    fun withPassword(hash: PasswordHash) = AdminUser(id, email, hash, name, role)
+
+    companion object {
+        fun create(email: Email, passwordHash: PasswordHash, name: String, role: AdminRole) =
+            AdminUser(id = null, email = email, passwordHash = passwordHash, name = name, role = role)
+    }
 
     override fun toString() = "AdminUser($email)"
 }
@@ -28,4 +35,9 @@ enum class AdminRole { SUPER_ADMIN, ADMIN }
 interface AdminUserRepository {
     fun findByEmail(email: Email): AdminUser?
     fun findById(id: Long): AdminUser?
+    fun findAll(): List<AdminUser>
+    fun existsByEmail(email: Email): Boolean
+    fun save(admin: AdminUser): AdminUser
+    fun deleteById(id: Long)
+    fun countByRole(role: AdminRole): Long
 }

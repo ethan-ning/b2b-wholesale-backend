@@ -1,11 +1,13 @@
 package com.acme.b2b.infrastructure.persistence.repository
 
+import com.acme.b2b.domain.admin.AdminRole
 import com.acme.b2b.domain.admin.AdminUser
 import com.acme.b2b.domain.admin.AdminUserRepository
 import com.acme.b2b.domain.common.Page
 import com.acme.b2b.domain.common.PageOf
 import com.acme.b2b.domain.customer.*
 import com.acme.b2b.infrastructure.persistence.converter.AccountDataConverter
+import com.acme.b2b.infrastructure.persistence.entity.AdminUserDO
 import com.acme.b2b.infrastructure.persistence.entity.CustomerDO
 import com.acme.b2b.infrastructure.persistence.jpa.AdminUserJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.CustomerJpaRepository
@@ -26,6 +28,19 @@ class AdminUserRepositoryImpl(
 
     override fun findById(id: Long): AdminUser? =
         jpa.findById(id).orElse(null)?.let { converter.toDomain(it) }
+
+    override fun findAll(): List<AdminUser> = jpa.findAll().map { converter.toDomain(it) }
+
+    override fun existsByEmail(email: Email): Boolean = jpa.existsByEmail(email.value)
+
+    override fun save(admin: AdminUser): AdminUser {
+        val row = admin.id?.let { jpa.findById(it).orElse(null) } ?: AdminUserDO()
+        return converter.toDomain(jpa.save(converter.applyTo(row, admin)))
+    }
+
+    override fun deleteById(id: Long) = jpa.deleteById(id)
+
+    override fun countByRole(role: AdminRole): Long = jpa.countByRole(role.name)
 }
 
 @Repository

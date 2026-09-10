@@ -42,3 +42,12 @@ data class CustomerTierDTO(
     val name: String,
     val sortOrder: Int,
 )
+
+/**
+ * Returned once, on creation. Same reasoning as [CustomerCreatedDTO]: the password is
+ * stored only as a hash, so this response is the sole opportunity to pass it on.
+ */
+data class AdminCreatedDTO(
+    val admin: AdminUserDTO,
+    val temporaryPassword: String,
+)

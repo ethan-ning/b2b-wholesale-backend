@@ -1,6 +1,7 @@
 package com.acme.b2b.web.support
 
 import com.acme.b2b.application.support.AuthenticationFailed
+import com.acme.b2b.application.support.NotPermitted
 import com.acme.b2b.application.support.UseCaseViolation
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -26,6 +27,11 @@ class ApiExceptionHandler {
     @ExceptionHandler(AuthenticationFailed::class)
     fun onAuthFailure(e: AuthenticationFailed): ResponseEntity<ApiError> =
         ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiError(e.message ?: "Unauthorized"))
+
+    /** 403, not 401: the caller is signed in, and bouncing them to a login page would not help. */
+    @ExceptionHandler(NotPermitted::class)
+    fun onNotPermitted(e: NotPermitted): ResponseEntity<ApiError> =
+        ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiError(e.message ?: "Not permitted"))
 
     @ExceptionHandler(NoSuchElementException::class)
     fun onMissing(e: NoSuchElementException): ResponseEntity<ApiError> =

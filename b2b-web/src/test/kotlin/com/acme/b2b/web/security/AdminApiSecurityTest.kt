@@ -1,5 +1,6 @@
 package com.acme.b2b.web.security
 
+import com.acme.b2b.application.admin.AdminAccountService
 import com.acme.b2b.application.admin.AdminAuthService
 import com.acme.b2b.application.admin.CategoryAdminService
 import com.acme.b2b.application.admin.CustomerAdminService
@@ -67,6 +68,7 @@ class AdminApiSecurityTest {
     @Autowired private lateinit var mockMvc: MockMvc
     @MockitoBean private lateinit var adminAuth: AdminAuthService
     @MockitoBean private lateinit var customers: CustomerAdminService
+    @MockitoBean private lateinit var adminAccounts: AdminAccountService
 
     /**
      * Not exercised here, but the whole routing table loads, so every controller's
@@ -172,11 +174,39 @@ class AdminApiSecurityTest {
             "/api/admin/products",
             "/api/admin/categories",
             "/api/admin/inventory",
+            "/api/admin/admins",
         ).forEach { path ->
             mockMvc.perform(get(path).header("Authorization", "Bearer $dealerToken"))
                 .andExpect(status().isForbidden)
             mockMvc.perform(get(path)).andExpect(status().isUnauthorized)
         }
+    }
+
+    /**
+     * Changing an admin password is behind the token, unlike signing in. The dealer's
+     * change-password endpoint is a different path with a different rule, and a dealer
+     * token reaching this one would let them rewrite an admin's credentials.
+     */
+    @Test
+    fun `admin change-password needs an admin token`() {
+        val body = """{"currentPassword":"OldPassword1","newPassword":"NewPassword1"}"""
+
+        mockMvc.perform(post("/api/admin/auth/change-password").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isUnauthorized)
+
+        mockMvc.perform(
+            post("/api/admin/auth/change-password")
+                .header("Authorization", "Bearer $dealerToken")
+                .contentType(MediaType.APPLICATION_JSON).content(body)
+        ).andExpect(status().isForbidden)
+
+        whenever(adminAccounts.changeOwnPassword(any()))
+            .thenReturn(AdminUserDTO(1, "admin@example.com", "System Admin", "ADMIN"))
+        mockMvc.perform(
+            post("/api/admin/auth/change-password")
+                .header("Authorization", "Bearer $adminToken")
+                .contentType(MediaType.APPLICATION_JSON).content(body)
+        ).andExpect(status().isOk)
     }
 
     @Test

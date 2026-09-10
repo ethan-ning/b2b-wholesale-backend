@@ -37,3 +37,14 @@ data class CustomerQuery(
     val page: Int = 0,
     val size: Int = 10,
 )
+
+data class ChangeAdminPasswordCommand(
+    val currentPassword: String,
+    val newPassword: String,
+)
+
+data class CreateAdminCommand(
+    val email: String,
+    val name: String,
+    val role: String,
+)

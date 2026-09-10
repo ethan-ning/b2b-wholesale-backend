@@ -1,7 +1,9 @@
 package com.acme.b2b.application.admin
 
 import com.acme.b2b.domain.admin.AdminUser
+import com.acme.b2b.domain.admin.AdminRole
 import com.acme.b2b.domain.admin.AdminUserRepository
+import com.acme.b2b.application.support.AdminContext
 import com.acme.b2b.domain.auth.AccessTokenIssuer
 import com.acme.b2b.domain.auth.PasswordHasher
 import com.acme.b2b.domain.auth.TemporaryPasswordGenerator
@@ -71,9 +73,28 @@ class InMemoryTierRepository(
     override fun findAll() = tiers
 }
 
-class InMemoryAdminRepository(private val admins: List<AdminUser>) : AdminUserRepository {
+class InMemoryAdminRepository(seed: List<AdminUser> = emptyList()) : AdminUserRepository {
+    private val admins = seed.toMutableList()
+    private var nextId = (seed.mapNotNull { it.id }.maxOrNull() ?: 0L) + 1
+
     override fun findByEmail(email: Email) = admins.firstOrNull { it.email == email }
     override fun findById(id: Long) = admins.firstOrNull { it.id == id }
+    override fun findAll(): List<AdminUser> = admins.toList()
+    override fun existsByEmail(email: Email) = admins.any { it.email == email }
+    override fun countByRole(role: AdminRole) = admins.count { it.role == role }.toLong()
+    override fun deleteById(id: Long) { admins.removeIf { it.id == id } }
+
+    override fun save(admin: AdminUser): AdminUser {
+        val id = admin.id ?: nextId++
+        val stored = AdminUser(id, admin.email, admin.passwordHash, admin.name, admin.role)
+        admins.removeIf { it.id == id }
+        admins += stored
+        return stored
+    }
+}
+
+class FixedAdminContext(private val id: Long?) : AdminContext {
+    override fun currentAdminId() = id
 }
 
 /** Reversible stand-in for BCrypt — fast, and lets a test assert on what was hashed. */

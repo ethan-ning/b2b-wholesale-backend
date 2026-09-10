@@ -129,6 +129,8 @@ interface CustomerTierJpaRepository : JpaRepository<CustomerTierDO, Long>
 
 interface AdminUserJpaRepository : JpaRepository<AdminUserDO, Long> {
     fun findByEmail(email: String): AdminUserDO?
+    fun existsByEmail(email: String): Boolean
+    fun countByRole(role: String): Long
 }
 
 interface CustomerJpaRepository : JpaRepository<CustomerDO, Long> {
