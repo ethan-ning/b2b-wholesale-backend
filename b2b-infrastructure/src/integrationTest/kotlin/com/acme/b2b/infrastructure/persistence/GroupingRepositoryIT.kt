@@ -166,6 +166,64 @@ class GroupingRepositoryIT : PostgresTest() {
         assertEquals("VISIBLE", products.findBySpuCode("KEEP-1")!!.visibility)
     }
 
+    /**
+     * The supplier names a product once. After that the name is the portal's, and a sync
+     * that reasserts it undoes every rename an admin made — quietly, and on a schedule,
+     * so a catalogue curated into English returns in the supplier's words overnight.
+     */
+    @Test
+    fun `a later sync leaves an edited name alone`() {
+        clear()
+        grouping.regroup(listOf(family("NAME-1", sku("NAME-1-A", "A"))))
+        em.flush()
+        em.createNativeQuery("UPDATE product SET name = 'Chrome Hub Cap' WHERE spu_code = 'NAME-1'").executeUpdate()
+        em.flush(); em.clear()
+
+        // The same family arrives again, still carrying the supplier's name.
+        grouping.regroup(listOf(family("NAME-1", sku("NAME-1-A", "A"))))
+        em.flush(); em.clear()
+
+        assertEquals("Chrome Hub Cap", products.findBySpuCode("NAME-1")!!.name)
+    }
+
+    @Test
+    fun `a product created by a sync still takes the supplier's name`() {
+        clear()
+
+        grouping.regroup(listOf(family("NAME-2", sku("NAME-2-A", "A"))))
+        em.flush(); em.clear()
+
+        assertEquals("Family NAME-2", products.findBySpuCode("NAME-2")!!.name)
+    }
+
+    /**
+     * Categories are filed by the portal and the sync has no opinion on them. Worth a test
+     * because the filing hangs off the product row by a cascading foreign key, so a change
+     * to how regroup handles products could take the tree's contents with it.
+     */
+    @Test
+    fun `a later sync leaves category filings alone`() {
+        clear()
+        grouping.regroup(listOf(family("CAT-1", sku("CAT-1-A", "A"))))
+        em.flush()
+        val categoryId = em.createNativeQuery(
+            "INSERT INTO category (name, slug, parent_id, sort_order) VALUES ('Hub Caps', 'hub-caps-it', NULL, 1) RETURNING id"
+        ).singleResult as Number
+        em.createNativeQuery(
+            "INSERT INTO product_category (product_id, category_id, is_primary) " +
+                "SELECT id, ?1, TRUE FROM product WHERE spu_code = 'CAT-1'"
+        ).setParameter(1, categoryId.toLong()).executeUpdate()
+        em.flush(); em.clear()
+
+        grouping.regroup(listOf(family("CAT-1", sku("CAT-1-A", "A"))))
+        em.flush(); em.clear()
+
+        val filings = em.createNativeQuery(
+            "SELECT count(*) FROM product_category pc JOIN product p ON p.id = pc.product_id WHERE p.spu_code = 'CAT-1'"
+        ).singleResult as Number
+        assertEquals(1, filings.toInt())
+    }
+
     // ─── Stock ───────────────────────────────────────────────────────────
 
     @Test

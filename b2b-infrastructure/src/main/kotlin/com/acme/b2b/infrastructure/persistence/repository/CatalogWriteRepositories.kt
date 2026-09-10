@@ -123,7 +123,13 @@ class ProductGroupingRepositoryImpl(
                 bySpu[family.spuCode] = it
                 productsCreated++
             }
-            target.name = family.name
+            // Name is taken from the supplier once, when the product is first created, and
+            // belongs to the portal from then on. Reasserting it here undid every rename an
+            // admin had made, on every sync, silently — a catalogue curated into English
+            // came back in the supplier's words the next morning.
+            //
+            // The axis is not the same kind of thing: which attribute the SKUs vary along
+            // is structure this grouping just derived, not a description someone wrote.
             target.variantAxis = family.axis?.label
             target.updatedAt = Instant.now()
             products.save(target)
