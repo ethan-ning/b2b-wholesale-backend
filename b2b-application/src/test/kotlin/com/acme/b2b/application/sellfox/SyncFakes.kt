@@ -21,9 +21,8 @@ import com.acme.b2b.domain.sellfox.SellfoxWarehouseScope
 import java.time.Instant
 
 /**
- * Stand-ins for the Sellfox side. The point of the ports is that the whole sync can be
- * driven without a network: these record what was asked of them and hand back whatever
- * the test set up, so a run's behaviour is observable without a live catalogue.
+ * Stand-ins for the Sellfox side, so the whole sync can be driven without a network.
+ * They record what was asked of them and return whatever the test set up.
  */
 
 fun commodity(

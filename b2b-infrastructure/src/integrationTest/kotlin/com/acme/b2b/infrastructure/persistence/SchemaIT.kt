@@ -10,10 +10,9 @@ import kotlin.test.assertTrue
 /**
  * That the schema applies and the mappings match it.
  *
- * `ddl-auto: validate` means the context in this test does not start at all unless every
- * @Entity lines up with the table Flyway created — so a column renamed in one and not the
- * other fails here rather than at deploy time. The assertions below cover what validation
- * cannot see: constraints, cascades and defaults.
+ * `ddl-auto: validate` means the context will not start unless every @Entity lines up with
+ * the table Flyway created, so most of this class is the setup succeeding. The assertions
+ * cover what validation cannot see: constraints and defaults.
  */
 class SchemaIT : PostgresTest() {
 

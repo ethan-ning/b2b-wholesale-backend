@@ -26,12 +26,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The rule this service exists to hold is that a product no dealer could buy from must not
- * be visible. An ERP import arrives unpriced, and a visible unpriced product is offered at
- * its base price, which for an import is zero — the one mistake here that costs money.
+ * The rule this service holds: a product no dealer could buy from must not be visible.
  *
- * It is reachable two ways, the eye button and the edit form, and both are covered below
- * because a rule enforced on one of two routes is not enforced.
+ * Two routes can set visibility, the eye button and the edit form, and both are covered —
+ * a rule enforced on one of two is not enforced.
  */
 class ProductAdminServiceTest {
 
@@ -134,8 +132,7 @@ class ProductAdminServiceTest {
         val products = InMemoryProductRepository(listOf(product()))
         val service = service(products)
 
-        // The reason the check runs after the price book is written: an admin should not
-        // have to save twice to publish a product they have just priced.
+        // Which is why the check runs after the price book is written.
         val result = service.update(
             1,
             command(
@@ -163,8 +160,7 @@ class ProductAdminServiceTest {
         val products = InMemoryProductRepository(
             listOf(product(variants = listOf(variant("PL-1-S", "S"), variant("PL-1-M", "M"))))
         )
-        // A product showing one size at a real price and the other at nothing reads as a
-        // bug rather than as a missing price, so every on-sale SKU has to be covered.
+        // One size priced and the other at nothing reads as a bug, not a missing price.
         val service = service(products, InMemoryTierPriceRepository(listOf(priced("PL-1-S"))))
 
         assertFailsWith<UseCaseViolation> { service.setActive(1, active = true) }
@@ -175,8 +171,7 @@ class ProductAdminServiceTest {
         val products = InMemoryProductRepository(
             listOf(product(variants = listOf(variant("PL-1-S", "S"), variant("PL-1-M", "M", active = false))))
         )
-        // The supplier stopped selling the M. Holding the product back over a SKU nobody
-        // can buy would be holding it back forever.
+        // Holding the product back over a SKU nobody can buy holds it back forever.
         val service = service(products, InMemoryTierPriceRepository(listOf(priced("PL-1-S"))))
 
         assertEquals("VISIBLE", service.setActive(1, active = true).product.visibility)
@@ -205,8 +200,7 @@ class ProductAdminServiceTest {
     fun `asking for the state it is already in changes nothing`() {
         val products = InMemoryProductRepository(listOf(product(visibility = ProductVisibility.VISIBLE)))
 
-        // No price book, so the guard would refuse if it ran — and it must not, because
-        // nothing is being turned on.
+        // No price book, so the guard would refuse — and must not run at all here.
         val result = service(products).setActive(1, active = true)
 
         assertEquals("VISIBLE", result.product.visibility)
@@ -256,7 +250,7 @@ class ProductAdminServiceTest {
         assertEquals("Chrome Hub Cap", saved.name)
         assertEquals(SpuCode("PL-1"), saved.spuCode)
         assertEquals(VariantAxis.SIZE, saved.variantAxis)
-        // And the portal's fields did change, so the test is not passing vacuously.
+        // And the portal's fields did change, so this is not passing vacuously.
         assertEquals(Money.of("12.00"), saved.baseWholesalePrice)
         assertEquals("A1-1", saved.locationCode)
     }

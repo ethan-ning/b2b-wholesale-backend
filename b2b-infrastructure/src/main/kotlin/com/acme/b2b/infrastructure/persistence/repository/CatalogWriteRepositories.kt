@@ -99,16 +99,13 @@ class ProductGroupingRepositoryImpl(
 ) : ProductGroupingRepository {
 
     /**
-     * One transaction, deliberately.
+     * One transaction, deliberately: a reparent, an emptied shell removed and unplaced
+     * SKUs withdrawn only make sense together.
      *
-     * A regroup is several writes that only make sense together — a SKU reparented, its
-     * old shell removed, SKUs nobody placed withdrawn. Half of it applied is a catalogue
-     * with variants pointing at products that are gone.
-     *
-     * Being explicit also settles which persistence context these run in. Left to the
-     * caller, each repository call got its own, and the code's assumptions about what a
-     * loaded collection contains were true only by accident of that. Two of them were
-     * wrong the moment anything wrapped this in a transaction; see the integration tests.
+     * It also settles which persistence context these run in. Left to the caller each
+     * repository call got its own, and two assumptions here about what a loaded collection
+     * holds were true only by accident of that — hence reading the database below rather
+     * than ProductDO.variants, which goes stale the moment this shares one context.
      */
     @Transactional
     override fun regroup(families: List<RegroupedFamily>): RegroupOutcome {

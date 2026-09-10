@@ -14,13 +14,12 @@ import org.testcontainers.containers.PostgreSQLContainer
 /**
  * A real Postgres, the real migration, the real mappings.
  *
- * These tests exist for the things a fake cannot be wrong about in the same way: whether
- * `V1__schema.sql` actually applies, whether Hibernate's mappings match the tables it
- * validates against, whether a cascade or a flush ordering behaves as the code assumes.
- * Everything else is a unit test — see `./gradlew test`.
+ * For the things a fake cannot be wrong about in the same way: whether a cascade fires,
+ * whether a flush ordering behaves as assumed, whether the schema matches what Hibernate
+ * validates against. Everything else is a unit test.
  *
- * The container is started once for the whole task and left to Ryuk to reap, rather than
- * per class. Twelve classes each waiting for Postgres to boot is a minute of nothing.
+ * One container for the whole task rather than per class, which would spend a minute
+ * waiting for Postgres to boot over and over.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -44,10 +43,7 @@ abstract class PostgresTest {
     }
 }
 
-/**
- * A context for the tests to live in. b2b-infrastructure has no application class of its
- * own — it is a library — so @DataJpaTest has nothing to find without this.
- */
+/** @DataJpaTest needs a configuration to find, and a library module has none. */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = [DataSourceAutoConfiguration::class])
 @EntityScan("com.acme.b2b.infrastructure.persistence.entity")

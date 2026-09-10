@@ -4,11 +4,8 @@ plugins {
 }
 
 /*
- * Integration tests get their own source set and their own task.
- *
- * They need Docker, and unit tests must not: `./gradlew test` runs on a plane, and the
- * moment a Postgres-backed test shares that task nobody can tell which kind failed.
- * `check` depends on both, so CI still runs everything.
+ * Integration tests get their own source set and task: they need Docker, and unit tests
+ * must not. `check` depends on both.
  *
  * Declared before `dependencies` because that block names the configurations this creates.
  */
@@ -38,11 +35,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("com.h2database:h2")
 
-    // Integration tests only, so `test` cannot quietly grow a dependency on Docker.
-    // The BOM and kotlin-test come from the root build for `test` alone, so name them here.
+    // The root build gives the BOM and kotlin-test to `test` alone, so name them again.
     "integrationTestImplementation"(platform("org.springframework.boot:spring-boot-dependencies:${property("spring-boot.version")}"))
-    // test-junit5 explicitly: the plugin only infers the variant for the standard
-    // `test` task, and a custom source set gets no kotlin.test.Test without it.
+    // test-junit5, not test: the plugin infers the variant only for the standard task.
     "integrationTestImplementation"(kotlin("test-junit5"))
     "integrationTestImplementation"("org.springframework.boot:spring-boot-starter-test")
     "integrationTestImplementation"("org.testcontainers:postgresql")
@@ -52,13 +47,11 @@ dependencies {
 }
 
 /**
- * Where this machine's Docker actually listens.
+ * Asks Docker about itself, or null when it is not there.
  *
- * Testcontainers looks for /var/run/docker.sock and gives up if it is not there, which it
- * is not under Colima, Rancher or a rootless daemon. The active Docker context already
- * knows the answer, so ask it rather than making every developer export DOCKER_HOST.
- * Returns null when Docker is absent — the task then fails with Testcontainers' own
- * message, which says more than anything invented here.
+ * Testcontainers looks for /var/run/docker.sock and gives up when it is elsewhere, as it
+ * is under Colima, Rancher and rootless daemons. The active context already knows, so ask
+ * it rather than making every developer export DOCKER_HOST.
  */
 fun docker(vararg args: String): String? = runCatching {
     val process = ProcessBuilder("docker", *args).redirectErrorStream(true).start()
@@ -68,13 +61,7 @@ fun docker(vararg args: String): String? = runCatching {
 
 fun activeDockerHost(): String? = docker("context", "inspect", "--format", "{{.Endpoints.docker.Host}}")
 
-/**
- * The daemon's API version, as a system property.
- *
- * docker-java otherwise negotiates 1.32, which Colima and other current daemons refuse
- * outright ("client version 1.32 is too old"). The environment variable is not the knob —
- * docker-java reads the `api.version` property.
- */
+/** docker-java otherwise negotiates 1.32, which current daemons refuse as too old. */
 fun serverApiVersion(): String? = docker("version", "--format", "{{.Server.APIVersion}}")
 
 val integrationTest = tasks.register<Test>("integrationTest") {
@@ -89,8 +76,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
         if (System.getenv("DOCKER_HOST") == null) {
             activeDockerHost()?.let { host ->
                 environment("DOCKER_HOST", host)
-                // Ryuk bind-mounts the socket by its in-container path, which stays the
-                // conventional one however the host exposes it.
+                // Ryuk mounts the socket by its in-container path, wherever the host keeps it.
                 environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
             }
         }
@@ -99,3 +85,12 @@ val integrationTest = tasks.register<Test>("integrationTest") {
 }
 
 tasks.named("check") { dependsOn(integrationTest) }
+
+/*
+ * Coverage here comes from integrationTest: the persistence layer has no unit tests and is
+ * not meant to. Reporting on `test` alone left the largest module out of the total at zero.
+ */
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(integrationTest)
+    executionData(integrationTest.get())
+}

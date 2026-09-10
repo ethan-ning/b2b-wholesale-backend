@@ -24,10 +24,8 @@ import kotlin.test.assertTrue
 /**
  * Regrouping and stock, against the real tables.
  *
- * These are the operations no aggregate can express — a SKU leaving one product for
- * another, a row being replaced rather than merged — so they are written at row level and
- * depend on Postgres behaving the way the code assumes. A fake would agree with whatever
- * the code did; this does not.
+ * A fake would agree with whatever the code did. These do not: three bugs here were found
+ * by running the same operations against Postgres in one transaction.
  */
 @Import(
     ProductGroupingRepositoryImpl::class,
@@ -83,8 +81,7 @@ class GroupingRepositoryIT : PostgresTest() {
         grouping.regroup(listOf(family("OLD-1", sku("MOVER-1", "1"))))
         em.flush(); em.clear()
 
-        // The unique constraint on product_variant.sku means this cannot be an insert
-        // followed by a delete — it has to be a move.
+        // The unique constraint on sku makes this a reparent, not insert-then-delete.
         val outcome = grouping.regroup(listOf(family("NEW-1", sku("MOVER-1", "1"))))
 
         assertEquals(1, outcome.skusMoved)
@@ -112,8 +109,7 @@ class GroupingRepositoryIT : PostgresTest() {
         assertEquals(1, outcome.skusWithdrawn)
         em.flush(); em.clear()
         val withdrawn = variants.findBySkuIn(setOf("SL-1-B")).single()
-        // Marked, not deleted: tier_price cascades from the SKU, and a SKU coming back on
-        // sale should find its pricing intact.
+        // Marked, not deleted: tier_price cascades from the SKU.
         assertEquals("DISCONTINUED", withdrawn.status)
         val keptPrice = em.createNativeQuery("SELECT count(*) FROM tier_price WHERE sku = 'SL-1-B'")
             .singleResult as Number
@@ -209,8 +205,7 @@ class GroupingRepositoryIT : PostgresTest() {
         )
         em.flush(); em.clear()
 
-        // Warehouse 2 is no longer in scope, so it contributes nothing to the new total
-        // and its old row must not survive to suggest otherwise.
+        // Warehouse 2 has left the scope; its old row must not survive the new total.
         stock.applyStock(listOf(SkuStockUpdate("ST-2-A", 40, 0, at, listOf(WarehouseStock(1, 40, 0)))))
 
         em.flush(); em.clear()
@@ -264,8 +259,7 @@ class GroupingRepositoryIT : PostgresTest() {
         stock.applyStock(listOf(SkuStockUpdate("ST-5-A", 5, 0, at, listOf(WarehouseStock(4242, 5, 0)))))
         em.flush(); em.clear()
 
-        // A LEFT JOIN, so stock in a warehouse that has left the scope is still reported —
-        // blank name rather than a missing row.
+        // Left join, so the row survives its warehouse leaving the registry.
         val line = breakdown.findBySkus(listOf("ST-5-A")).single()
         assertEquals(4242, line.warehouseId)
         assertEquals("", line.warehouseName)

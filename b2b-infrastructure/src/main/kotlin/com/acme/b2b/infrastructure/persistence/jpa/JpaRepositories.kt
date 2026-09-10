@@ -39,12 +39,9 @@ interface ProductJpaRepository : JpaRepository<ProductDO, Long> {
     fun findByCategoryId(@Param("categoryId") categoryId: Long): List<ProductDO>
 
     /**
-     * Removes products by id, without the entity cascade.
-     *
-     * deleteAll would cascade into ProductDO.variants, and after a regroup that collection
-     * can still hold a SKU which has just moved to another product — deleting the shell
-     * would take the SKU with it. The schema cascades what genuinely belongs to a product
-     * (its images and category links), so the database is the safer place to do this.
+     * Removes products by id, without the entity cascade — which would reach into
+     * ProductDO.variants and take a SKU that has just moved elsewhere. The schema already
+     * cascades what genuinely belongs to a product.
      */
     @Modifying
     @Query("DELETE FROM ProductDO p WHERE p.id IN :ids")
@@ -79,14 +76,7 @@ interface VariantWarehouseStockJpaRepository : JpaRepository<VariantWarehouseSto
 
 interface ProductVariantJpaRepository : JpaRepository<ProductVariantDO, Long> {
 
-    /**
-     * Products of this source that still hold at least one SKU.
-     *
-     * Asked of the database rather than read off ProductDO.variants: a product created
-     * earlier in the same persistence context carries the empty collection it was built
-     * with, and Hibernate does not refresh an initialised collection. Trusting it made
-     * every newly created product look empty.
-     */
+    /** Products of this source that still hold a SKU. Asked of the database, not of ProductDO.variants. */
     @Query("SELECT DISTINCT v.product.id FROM ProductVariantDO v WHERE v.product.source = :source")
     fun productIdsHoldingSkus(@Param("source") source: String): List<Long>
 

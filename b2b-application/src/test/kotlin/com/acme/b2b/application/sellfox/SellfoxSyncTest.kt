@@ -23,9 +23,8 @@ import kotlin.test.assertTrue
 /**
  * The sync end to end, without a network.
  *
- * Three steps in the only order that works: the import records what Sellfox said, the
- * regroup turns those facts into products, and the stock pass counts what the regroup
- * just placed. Each is tested for the thing it alone is responsible for.
+ * Three steps in the only order that works — record the facts, group them into products,
+ * count the stock — each tested for what it alone is responsible for.
  */
 class SellfoxSyncTest {
 
@@ -86,8 +85,7 @@ class SellfoxSyncTest {
     @Test
     fun `an inactive commodity is never recorded`() {
         val links = InMemorySkuLinkRepository()
-        // Only 在售 commodities are imported, so a product going off sale leaves the
-        // catalogue by not being imported rather than by any portal flag.
+        // Only 在售 commodities are imported: going off sale means not being imported.
         SellfoxCatalogImporter(
             FakeCatalogPort(listOf(commodity("GONE-1", active = false))),
             InMemoryScopeRepository(selectedCategories = setOf("10-20")),
@@ -143,8 +141,7 @@ class SellfoxSyncTest {
             InMemorySkuLinkRepository(),
         ).recordFacts(SyncCounts(), now)
 
-        // Two commodities collapse into one group; a one-level path is its own group
-        // rather than being dropped.
+        // Two collapse into one group; a one-level path is its own rather than dropped.
         assertEquals(setOf("10-20", "99"), scope.categoriesSeen.map { it.cid }.toSet())
         assertEquals(2, scope.categoriesSeen.single { it.cid == "10-20" }.commodityCount)
     }
@@ -229,8 +226,7 @@ class SellfoxSyncTest {
         val inventory = FakeInventoryPort(
             warehouses = listOf(SellfoxWarehouse(1, "TX", 3), SellfoxWarehouse(9, "CN", 1)),
         )
-        // Stock in a warehouse that cannot reach a US dealer must stay out of the number
-        // they see, and that is enforced by never reading it.
+        // Stock that cannot reach a US dealer stays out by never being read.
         SellfoxStockUpdater(inventory, InMemoryScopeRepository(selectedWarehouses = listOf(1)), RecordingStockRepository())
             .refresh(SyncCounts(), now)
 

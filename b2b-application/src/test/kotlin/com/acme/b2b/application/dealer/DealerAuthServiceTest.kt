@@ -22,10 +22,8 @@ import kotlin.test.assertTrue
 /**
  * Dealer sign-in and the forced first password change.
  *
- * The rule under most of this is that every failure looks the same from outside. Wrong
- * password, unknown email, suspended account — telling them apart would tell an outsider
- * which dealers exist and which have been cut off, and the dealer learns nothing useful
- * from the difference.
+ * Every failure looks the same from outside. Telling wrong password from unknown email
+ * from suspended account would say which dealers exist and which have been cut off.
  */
 class DealerAuthServiceTest {
 
@@ -92,8 +90,7 @@ class DealerAuthServiceTest {
         val response = service(dealer(mustChangePassword = true))
             .login(login("dealer1@example.com", "correct-horse"))
 
-        // Not a catalog token: the forced change must not depend on the client honouring
-        // a flag it can see and ignore.
+        // Not a catalog token: the change must not depend on the client honouring a flag.
         assertEquals("pwchange-token:1", response.token)
         assertTrue(response.user.mustChangePassword)
     }
@@ -139,8 +136,7 @@ class DealerAuthServiceTest {
 
     @Test
     fun `a new password that the rules refuse is reported as a rule, not as a bad login`() {
-        // The dealer knows their own current password here, so telling them what is wrong
-        // with the replacement gives nothing away.
+        // They proved the current password, so saying what is wrong gives nothing away.
         assertFailsWith<UseCaseViolation> {
             service(dealer()).changePassword(1, ChangePasswordCommand("correct-horse", "short"))
         }
