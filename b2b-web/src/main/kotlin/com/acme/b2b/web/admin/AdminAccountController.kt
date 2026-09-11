@@ -4,6 +4,7 @@ import com.acme.b2b.application.admin.AdminAccountService
 import com.acme.b2b.application.admin.ChangeAdminPasswordCommand
 import com.acme.b2b.application.admin.CreateAdminCommand
 import com.acme.b2b.application.admin.dto.AdminCreatedDTO
+import com.acme.b2b.application.admin.dto.AdminLoginResponse
 import com.acme.b2b.application.admin.dto.AdminUserDTO
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -18,8 +19,9 @@ class AdminAccountController(
     private val accounts: AdminAccountService,
 ) {
 
+    /** Returns a full session token: the caller may have arrived with a restricted one. */
     @PostMapping("/auth/change-password")
-    fun changeOwnPassword(@RequestBody request: ChangeAdminPasswordCommand): AdminUserDTO =
+    fun changeOwnPassword(@RequestBody request: ChangeAdminPasswordCommand): AdminLoginResponse =
         accounts.changeOwnPassword(request)
 
     @GetMapping("/admins")

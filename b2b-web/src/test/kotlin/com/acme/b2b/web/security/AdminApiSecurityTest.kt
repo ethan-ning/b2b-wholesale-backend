@@ -204,8 +204,9 @@ class AdminApiSecurityTest {
         val restricted = token(scope = "ADMIN_PASSWORD_CHANGE", secret = SECRET)
         val body = """{"currentPassword":"OldPassword1","newPassword":"NewPassword1"}"""
 
-        whenever(adminAccounts.changeOwnPassword(any()))
-            .thenReturn(AdminUserDTO(1, "admin@example.com", "System Admin", "ADMIN"))
+        whenever(adminAccounts.changeOwnPassword(any())).thenReturn(
+            AdminLoginResponse("a-token", AdminUserDTO(1, "admin@example.com", "System Admin", "ADMIN"))
+        )
         mockMvc.perform(
             post("/api/admin/auth/change-password")
                 .header("Authorization", "Bearer $restricted")
@@ -251,8 +252,9 @@ class AdminApiSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON).content(body)
         ).andExpect(status().isForbidden)
 
-        whenever(adminAccounts.changeOwnPassword(any()))
-            .thenReturn(AdminUserDTO(1, "admin@example.com", "System Admin", "ADMIN"))
+        whenever(adminAccounts.changeOwnPassword(any())).thenReturn(
+            AdminLoginResponse("a-token", AdminUserDTO(1, "admin@example.com", "System Admin", "ADMIN"))
+        )
         mockMvc.perform(
             post("/api/admin/auth/change-password")
                 .header("Authorization", "Bearer $adminToken")

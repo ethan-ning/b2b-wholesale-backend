@@ -1,6 +1,7 @@
 package com.acme.b2b.application.admin
 
 import com.acme.b2b.application.admin.dto.AdminCreatedDTO
+import com.acme.b2b.application.admin.dto.AdminLoginResponse
 import com.acme.b2b.application.admin.dto.AdminUserDTO
 import com.acme.b2b.application.support.AdminContext
 import com.acme.b2b.application.support.AuthenticationFailed
@@ -9,6 +10,7 @@ import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.admin.AdminRole
 import com.acme.b2b.domain.admin.AdminUser
 import com.acme.b2b.domain.admin.AdminUserRepository
+import com.acme.b2b.domain.auth.AccessTokenIssuer
 import com.acme.b2b.domain.auth.PasswordHasher
 import com.acme.b2b.domain.auth.TemporaryPasswordGenerator
 import com.acme.b2b.types.Email
@@ -28,6 +30,7 @@ class AdminAccountService(
     private val admins: AdminUserRepository,
     private val passwordHasher: PasswordHasher,
     private val temporaryPasswords: TemporaryPasswordGenerator,
+    private val tokens: AccessTokenIssuer,
     private val context: AdminContext,
 ) {
 
@@ -40,9 +43,12 @@ class AdminAccountService(
     /**
      * Requires the current password even though the caller is already authenticated —
      * an unattended session should not be enough to take an account over.
+     *
+     * Returns a full session token. Someone finishing a forced change arrived holding one
+     * that reaches only this endpoint, and would otherwise be left signed in to nothing.
      */
     @Transactional
-    fun changeOwnPassword(command: ChangeAdminPasswordCommand): AdminUserDTO {
+    fun changeOwnPassword(command: ChangeAdminPasswordCommand): AdminLoginResponse {
         val admin = caller()
 
         val current = runCatching { RawPassword(command.currentPassword) }.getOrNull()
@@ -58,7 +64,12 @@ class AdminAccountService(
             throw UseCaseViolation("The new password must differ from the current one")
         }
 
-        return AdminAssembler.toDTO(admins.save(admin.withChosenPassword(passwordHasher.hash(replacement))))
+        val updated = admins.save(admin.withChosenPassword(passwordHasher.hash(replacement)))
+        val id = checkNotNull(updated.id) { "A persisted admin must have an id" }
+        return AdminLoginResponse(
+            token = tokens.issueForAdmin(id, updated.email.value, updated.role.name),
+            admin = AdminAssembler.toDTO(updated),
+        )
     }
 
     @Transactional

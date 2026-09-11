@@ -28,6 +28,7 @@ class AdminAccountServiceTest {
             admins = repo,
             passwordHasher = FakePasswordHasher(),
             temporaryPasswords = FixedTemporaryPasswordGenerator(),
+            tokens = FakeTokenIssuer(),
             context = FixedAdminContext(callerId),
         ) to repo
     }
@@ -36,10 +37,12 @@ class AdminAccountServiceTest {
     fun `an admin can change their own password`() {
         val (service, repo) = serviceAs(callerId = 2)
 
-        service.changeOwnPassword(ChangeAdminPasswordCommand("Secret12345", "BrandNew98765"))
+        val result = service.changeOwnPassword(ChangeAdminPasswordCommand("Secret12345", "BrandNew98765"))
 
         val stored = repo.findById(2)!!
         assertEquals("hashed:BrandNew98765", stored.passwordHash.value)
+        // A full session token, so someone who arrived on a restricted one is not stranded.
+        assertEquals("admin-token:2:ADMIN", result.token)
     }
 
     @Test
