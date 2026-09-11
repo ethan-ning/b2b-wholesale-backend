@@ -104,10 +104,8 @@ class AdminApiSecurityTest {
     }
 
     /**
-     * Browsers send Origin on POST even same-origin, so an origin the server does not know
-     * is refused by the CORS filter before any controller runs — 403, not the 401 a wrong
-     * password gives. Curl sends no Origin, which is how this passed every test and every
-     * manual check while failing every actual sign-in.
+     * Browsers send Origin on POST even same-origin, so an unknown one is refused by the
+     * CORS filter before any controller runs — 403, not the 401 a wrong password gives.
      */
     @Test
     fun `a sign-in from a configured origin is not blocked`() {
@@ -133,13 +131,11 @@ class AdminApiSecurityTest {
         ).andExpect(status().isForbidden)
     }
 
-    // Every static path the sign-in pages need before anyone has a token. The brand
-    // images ship in their own directory rather than the bundler's, so the rule covering
-    // bundled assets did not reach them and they 401'd in production — on the one page a
-    // visitor gets to without credentials.
+    // Every static path the sign-in pages need before anyone has a token; the brand images
+    // ship outside the bundler's directory, so they need their own rule.
     //
-    // Line comments, not a KDoc block: Kotlin nests block comments, and a wildcard path
-    // written out in full closes with a slash-star that opens one.
+    // Line comments, not KDoc: Kotlin nests block comments, and a wildcard path written out
+    // in full closes with a slash-star that opens one.
     @Test
     fun `the portal's own static files are reachable without a token`() {
         listOf("/favicon.svg", "/assets/index.js", "/brand/logo-horizontal.png", "/brand/hero.jpg")
@@ -198,11 +194,7 @@ class AdminApiSecurityTest {
         }
     }
 
-    /**
-     * Changing an admin password is behind the token, unlike signing in. The dealer's
-     * change-password endpoint is a different path with a different rule, and a dealer
-     * token reaching this one would let them rewrite an admin's credentials.
-     */
+    /** Behind the token, unlike signing in: a dealer token here would rewrite an admin's. */
     @Test
     fun `admin change-password needs an admin token`() {
         val body = """{"currentPassword":"OldPassword1","newPassword":"NewPassword1"}"""

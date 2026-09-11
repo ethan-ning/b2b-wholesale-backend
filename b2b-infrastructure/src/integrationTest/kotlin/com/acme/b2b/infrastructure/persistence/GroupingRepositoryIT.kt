@@ -166,11 +166,7 @@ class GroupingRepositoryIT : PostgresTest() {
         assertEquals("VISIBLE", products.findBySpuCode("KEEP-1")!!.visibility)
     }
 
-    /**
-     * The supplier names a product once. After that the name is the portal's, and a sync
-     * that reasserts it undoes every rename an admin made — quietly, and on a schedule,
-     * so a catalogue curated into English returns in the supplier's words overnight.
-     */
+    /** The supplier names a product once; after that the name is the portal's. */
     @Test
     fun `a later sync leaves an edited name alone`() {
         clear()
@@ -197,9 +193,8 @@ class GroupingRepositoryIT : PostgresTest() {
     }
 
     /**
-     * Categories are filed by the portal and the sync has no opinion on them. Worth a test
-     * because the filing hangs off the product row by a cascading foreign key, so a change
-     * to how regroup handles products could take the tree's contents with it.
+     * The sync has no opinion on categories, but the filing hangs off the product row by a
+     * cascading key — so a change to how regroup handles products could take it with them.
      */
     @Test
     fun `a later sync leaves category filings alone`() {

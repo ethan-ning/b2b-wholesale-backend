@@ -19,9 +19,8 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * Admin accounts: their own password, and — for a super admin — the roster.
  *
- * Every privilege check loads the acting admin from the database rather than trusting
- * the role claim in their token. A token outlives a demotion, and the window between
- * the two is exactly when the check matters most.
+ * Privilege is read from the database, not from the role claim in the caller's token: a
+ * token outlives a demotion, and that window is when the check matters most.
  */
 @Service
 @Transactional(readOnly = true)
@@ -87,9 +86,8 @@ class AdminAccountService(
     }
 
     /**
-     * Two refusals that are not about permission. Removing yourself is almost always a
-     * misclick, and removing the last super admin leaves an installation nobody can ever
-     * add an admin to again — recoverable only by editing the database by hand.
+     * Two refusals that are not about permission: removing yourself is almost always a
+     * misclick, and removing the last super admin leaves nobody who can appoint one.
      */
     @Transactional
     fun delete(id: Long) {

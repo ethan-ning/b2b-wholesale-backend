@@ -29,10 +29,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 @EnableWebSecurity
 class WebSecurityConfig(
     /**
-     * Origins allowed to call /api. The Vite dev server by default; deployments add their
-     * own, because a browser sends Origin on POST even when the page came from the same
-     * host — so an origin missing here fails every form submission with 403 while GETs,
-     * which carry no Origin, keep working and hide it.
+     * Origins allowed to call /api — the Vite dev server by default, deployments add their
+     * own. A browser sends Origin on POST even same-host, so an origin missing here fails
+     * every form submission with 403 while GETs, which carry none, keep working and hide it.
      */
     @Value("\${app.cors.allowed-origins:http://localhost:5173}")
     private val allowedOrigins: List<String>,
@@ -49,16 +48,12 @@ class WebSecurityConfig(
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/auth/login", "/api/admin/auth/login").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
-                    // The single-page app, when it is packaged alongside the API.
-                    //
-                    // Its files and its routes, because a browser opening /admin/login has
-                    // no token yet and the page it needs in order to get one must not 401.
-                    // Nothing is given away: these serve the same index.html to everyone,
-                    // and every byte of data behind them still comes from /api, which is
-                    // not on this list.
-                    // /assets/** is what the bundler emits; /brand/** is what it copies
-                    // through untouched. A logo behind a 401 renders as a broken image on
-                    // the sign-in page, which is the one page nobody has a token for yet.
+                    // The single-page app: its files and its routes, because a browser
+                    // opening /admin/login has no token yet and the page it needs in order
+                    // to get one must not 401. Nothing is given away — these serve the same
+                    // index.html to everyone, and the data behind them still comes from
+                    // /api, which is not on this list. /assets/** is what the bundler emits,
+                    // /brand/** what it copies through untouched.
                     .requestMatchers(
                         HttpMethod.GET,
                         "/", "/index.html", "/favicon.svg", "/assets/**", "/brand/**",

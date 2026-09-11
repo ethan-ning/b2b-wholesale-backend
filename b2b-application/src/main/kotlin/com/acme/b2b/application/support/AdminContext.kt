@@ -1,13 +1,11 @@
 package com.acme.b2b.application.support
 
 /**
- * Which admin is asking. A port for the same reason [DealerContext] is one: the
- * application layer needs the caller's identity to decide what they may do, and must
- * not know how that identity was established.
+ * Which admin is asking. A port for the same reason [DealerContext] is one: the caller's
+ * identity decides what they may do, and how it was established is not this layer's
+ * business.
  *
- * Only the id travels. Role is deliberately not taken from here — it is read from the
- * database at the point of the check, so an admin demoted after their token was issued
- * loses the privilege immediately rather than at expiry.
+ * Only the id travels; role is read from the database at the point of the check.
  */
 interface AdminContext {
     fun currentAdminId(): Long?

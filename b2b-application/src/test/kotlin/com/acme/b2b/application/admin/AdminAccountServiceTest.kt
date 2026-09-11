@@ -31,8 +31,6 @@ class AdminAccountServiceTest {
         ) to repo
     }
 
-    // ---- own password ----------------------------------------------------------------
-
     @Test
     fun `an admin can change their own password`() {
         val (service, repo) = serviceAs(callerId = 2)
@@ -71,8 +69,6 @@ class AdminAccountServiceTest {
         assertEquals("hashed:Secret12345", repo.findById(1)!!.passwordHash.value)
     }
 
-    // ---- who may manage admins -------------------------------------------------------
-
     @Test
     fun `a plain admin cannot create another admin`() {
         val (service, repo) = serviceAs(callerId = 2)
@@ -101,7 +97,6 @@ class AdminAccountServiceTest {
         assertEquals("new@example.com", created.admin.email)
         assertEquals("New Person", created.admin.name)
         assertEquals("ADMIN", created.admin.role)
-        // Listing never exposes it again — the DTO has no password field at all.
         assertTrue(service.list().any { it.email == "new@example.com" })
         assertEquals("hashed:TempPass1234", repo.findByEmail(Email.of("new@example.com"))!!.passwordHash.value)
     }
@@ -132,8 +127,6 @@ class AdminAccountServiceTest {
             service.create(CreateAdminCommand("new@example.com", "New Person", "OWNER"))
         }
     }
-
-    // ---- the two guards that are not about permission ---------------------------------
 
     @Test
     fun `a super admin cannot delete themselves`() {
@@ -171,8 +164,6 @@ class AdminAccountServiceTest {
 
         assertFailsWith<NoSuchElementException> { service.delete(999) }
     }
-
-    // ---- privilege comes from the database, not the token -----------------------------
 
     @Test
     fun `an admin whose account is gone cannot act on a still-valid token`() {
