@@ -35,10 +35,14 @@ class AdminAuthService(
         }
 
         val id = checkNotNull(admin.id) { "A persisted admin must have an id" }
-        return AdminLoginResponse(
-            token = tokens.issueForAdmin(id, admin.email.value, admin.role.name),
-            admin = AdminAssembler.toDTO(admin),
-        )
+        // An admin still on a password somebody else generated gets a token that reaches
+        // only the change-password endpoint, so the forced change does not depend on the
+        // client choosing to honour a flag.
+        val token =
+            if (admin.mustChangePassword) tokens.issueAdminPasswordChangeToken(id, admin.email.value)
+            else tokens.issueForAdmin(id, admin.email.value, admin.role.name)
+
+        return AdminLoginResponse(token = token, admin = AdminAssembler.toDTO(admin))
     }
 
     private companion object {

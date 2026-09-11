@@ -14,4 +14,11 @@ interface AccessTokenIssuer {
      * allowed to reach rather than by the client agreeing to navigate somewhere.
      */
     fun issuePasswordChangeToken(customerId: Long, email: String): String
+
+    /**
+     * The same idea for an admin, and deliberately not the same token. One scope for both
+     * would let an admin part-way through a forced change reach the dealer endpoint, and a
+     * dealer reach the admin one.
+     */
+    fun issueAdminPasswordChangeToken(adminId: Long, email: String): String
 }

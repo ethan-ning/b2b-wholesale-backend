@@ -67,6 +67,15 @@ class JwtAccessTokenIssuer(
             ttlMinutes = 30,
         )
 
+    override fun issueAdminPasswordChangeToken(adminId: Long, email: String): String =
+        sign(
+            JWTClaimsSet.Builder()
+                .subject(adminId.toString())
+                .claim("email", email)
+                .claim("scope", "ADMIN_PASSWORD_CHANGE"),
+            ttlMinutes = 30,
+        )
+
     private fun sign(claims: JWTClaimsSet.Builder, ttlMinutes: Long = this.ttlMinutes): String {
         val now = Instant.now()
         val jwt = SignedJWT(

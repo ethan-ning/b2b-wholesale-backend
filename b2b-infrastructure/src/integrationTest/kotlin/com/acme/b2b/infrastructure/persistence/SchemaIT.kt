@@ -46,6 +46,41 @@ class SchemaIT : PostgresTest() {
         )
     }
 
+    /**
+     * V2 adds this, so it is the first thing in the schema that does not come from V1. A
+     * migration that did not run leaves every admin login working and only the forced
+     * change silently absent.
+     */
+    @Test
+    fun `the later migrations have run, not only the first`() {
+        val column = em.createNativeQuery(
+            """
+            SELECT is_nullable || ' ' || column_default
+            FROM information_schema.columns
+            WHERE table_name = 'admin_user' AND column_name = 'must_change_password'
+            """
+        ).resultList.map { it.toString() }
+
+        assertEquals(listOf("NO false"), column)
+    }
+
+    @Test
+    fun `an admin defaults to not needing a password change`() {
+        // Admins who already existed must not be locked out by the new column.
+        em.createNativeQuery(
+            """
+            INSERT INTO admin_user (email, password_hash, name, role)
+            VALUES ('existing@example.com', 'x', 'Existing', 'ADMIN')
+            """
+        ).executeUpdate()
+
+        val forced = em.createNativeQuery(
+            "SELECT must_change_password FROM admin_user WHERE email = 'existing@example.com'"
+        ).singleResult
+
+        assertEquals(false, forced)
+    }
+
     @Test
     fun `the two pricing tiers are seeded with fixed ids`() {
         // tier_price rows reference these, so insertion order must not decide them.

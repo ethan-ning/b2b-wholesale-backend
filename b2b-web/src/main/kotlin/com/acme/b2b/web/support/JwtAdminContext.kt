@@ -23,5 +23,7 @@ class JwtAdminContext : AdminContext {
             ?.subject
             ?.toLongOrNull()
 
-    private fun Jwt.isAdmin(): Boolean = getClaim<Any>("scope")?.toString() == "ADMIN"
+    /** Includes the restricted token, whose whole purpose is to change its own password. */
+    private fun Jwt.isAdmin(): Boolean =
+        getClaim<Any>("scope")?.toString() in setOf("ADMIN", "ADMIN_PASSWORD_CHANGE")
 }

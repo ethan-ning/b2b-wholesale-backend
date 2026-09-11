@@ -30,6 +30,10 @@ class AdminAccountController(
     fun create(@RequestBody request: CreateAdminCommand): ResponseEntity<AdminCreatedDTO> =
         ResponseEntity.status(201).body(accounts.create(request))
 
+    /** 200 with a new generated password — the only time it is ever returned. */
+    @PostMapping("/admins/{id}/reset-password")
+    fun resetPassword(@PathVariable id: Long): AdminCreatedDTO = accounts.resetPassword(id)
+
     @DeleteMapping("/admins/{id}")
     fun delete(@PathVariable id: Long): ResponseEntity<Void> {
         accounts.delete(id)

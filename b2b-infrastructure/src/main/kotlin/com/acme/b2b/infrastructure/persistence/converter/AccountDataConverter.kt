@@ -21,6 +21,7 @@ class AccountDataConverter {
         passwordHash = PasswordHash(row.passwordHash),
         name = row.name,
         role = AdminRole.valueOf(row.role),
+        mustChangePassword = row.mustChangePassword,
     )
 
     fun toDomain(row: CustomerDO) = Customer(
@@ -50,6 +51,7 @@ class AccountDataConverter {
         row.passwordHash = admin.passwordHash.value
         row.name = admin.name
         row.role = admin.role.name
+        row.mustChangePassword = admin.mustChangePassword
         return row
     }
 

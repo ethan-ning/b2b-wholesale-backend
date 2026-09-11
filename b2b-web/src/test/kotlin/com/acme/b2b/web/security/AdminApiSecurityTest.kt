@@ -194,6 +194,49 @@ class AdminApiSecurityTest {
         }
     }
 
+    /**
+     * The two restricted tokens must not cross. Each reaches its own change-password
+     * endpoint and nothing else — including the other side's, which would let someone
+     * part-way through a forced change rewrite an account that is not theirs.
+     */
+    @Test
+    fun `a restricted admin token reaches only the admin change-password endpoint`() {
+        val restricted = token(scope = "ADMIN_PASSWORD_CHANGE", secret = SECRET)
+        val body = """{"currentPassword":"OldPassword1","newPassword":"NewPassword1"}"""
+
+        whenever(adminAccounts.changeOwnPassword(any()))
+            .thenReturn(AdminUserDTO(1, "admin@example.com", "System Admin", "ADMIN"))
+        mockMvc.perform(
+            post("/api/admin/auth/change-password")
+                .header("Authorization", "Bearer $restricted")
+                .contentType(MediaType.APPLICATION_JSON).content(body)
+        ).andExpect(status().isOk)
+
+        // Not the back office it would otherwise be signed in to.
+        mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer $restricted"))
+            .andExpect(status().isForbidden)
+        mockMvc.perform(get("/api/admin/admins").header("Authorization", "Bearer $restricted"))
+            .andExpect(status().isForbidden)
+        // Nor the dealer's own change-password endpoint.
+        mockMvc.perform(
+            post("/api/auth/change-password")
+                .header("Authorization", "Bearer $restricted")
+                .contentType(MediaType.APPLICATION_JSON).content(body)
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `a dealer's restricted token does not reach the admin change-password endpoint`() {
+        val pwToken = token(scope = "PASSWORD_CHANGE", secret = SECRET)
+
+        mockMvc.perform(
+            post("/api/admin/auth/change-password")
+                .header("Authorization", "Bearer $pwToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"currentPassword":"a","newPassword":"b"}""")
+        ).andExpect(status().isForbidden)
+    }
+
     /** Behind the token, unlike signing in: a dealer token here would rewrite an admin's. */
     @Test
     fun `admin change-password needs an admin token`() {

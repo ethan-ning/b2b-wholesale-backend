@@ -58,7 +58,7 @@ class AdminAccountService(
             throw UseCaseViolation("The new password must differ from the current one")
         }
 
-        return AdminAssembler.toDTO(admins.save(admin.withPassword(passwordHasher.hash(replacement))))
+        return AdminAssembler.toDTO(admins.save(admin.withChosenPassword(passwordHasher.hash(replacement))))
     }
 
     @Transactional
@@ -83,6 +83,23 @@ class AdminAccountService(
             )
         )
         return AdminCreatedDTO(AdminAssembler.toDTO(created), temporary.value)
+    }
+
+    /**
+     * A new generated password for someone who has lost theirs, shown once. The account is
+     * put back on a forced change, so the password this returns reaches exactly one screen.
+     */
+    @Transactional
+    fun resetPassword(id: Long): AdminCreatedDTO {
+        val manager = requireManager()
+        val target = admins.findById(id) ?: throw NoSuchElementException("No such admin")
+        if (target.id == manager.id) {
+            throw UseCaseViolation("Use change password for your own account")
+        }
+
+        val temporary = temporaryPasswords.generate()
+        val reset = admins.save(target.withIssuedPassword(passwordHasher.hash(temporary)))
+        return AdminCreatedDTO(AdminAssembler.toDTO(reset), temporary.value)
     }
 
     /**

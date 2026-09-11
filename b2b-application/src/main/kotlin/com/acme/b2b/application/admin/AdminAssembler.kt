@@ -14,6 +14,7 @@ object AdminAssembler {
         email = admin.email.value,
         name = admin.name,
         role = admin.role.name,
+        mustChangePassword = admin.mustChangePassword,
     )
 
     /**

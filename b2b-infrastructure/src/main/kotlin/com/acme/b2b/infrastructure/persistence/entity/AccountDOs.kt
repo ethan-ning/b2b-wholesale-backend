@@ -21,6 +21,9 @@ class AdminUserDO(
     @Column(nullable = false)
     var role: String = "ADMIN",
 
+    @Column(name = "must_change_password", nullable = false)
+    var mustChangePassword: Boolean = false,
+
     @Column(name = "created_at")
     var createdAt: Instant? = null,
 )

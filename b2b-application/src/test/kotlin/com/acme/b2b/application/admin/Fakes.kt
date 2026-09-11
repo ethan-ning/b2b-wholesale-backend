@@ -86,7 +86,9 @@ class InMemoryAdminRepository(seed: List<AdminUser> = emptyList()) : AdminUserRe
 
     override fun save(admin: AdminUser): AdminUser {
         val id = admin.id ?: nextId++
-        val stored = AdminUser(id, admin.email, admin.passwordHash, admin.name, admin.role)
+        val stored = AdminUser(
+            id, admin.email, admin.passwordHash, admin.name, admin.role, admin.mustChangePassword,
+        )
         admins.removeIf { it.id == id }
         admins += stored
         return stored
@@ -111,6 +113,7 @@ class FakeTokenIssuer : AccessTokenIssuer {
     override fun issueForAdmin(adminId: Long, email: String, role: String) = "admin-token:$adminId:$role"
     override fun issueForDealer(customerId: Long, email: String, tierId: Long) = "dealer-token:$customerId:$tierId"
     override fun issuePasswordChangeToken(customerId: Long, email: String) = "pwchange-token:$customerId"
+    override fun issueAdminPasswordChangeToken(adminId: Long, email: String) = "admin-pwchange-token:$adminId"
 }
 
 /**

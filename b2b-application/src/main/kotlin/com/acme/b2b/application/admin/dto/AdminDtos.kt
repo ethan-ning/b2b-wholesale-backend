@@ -7,6 +7,7 @@ data class AdminUserDTO(
     val email: String,
     val name: String,
     val role: String,
+    val mustChangePassword: Boolean = false,
 )
 
 data class AdminLoginResponse(

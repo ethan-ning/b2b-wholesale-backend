@@ -10,6 +10,7 @@ import com.acme.b2b.types.PasswordHash
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -175,6 +176,82 @@ class AdminAccountServiceTest {
         assertFailsWith<AuthenticationFailed> {
             service.create(CreateAdminCommand("new@example.com", "New Person", "ADMIN"))
         }
+    }
+
+    @Test
+    fun `a new admin starts on a password they did not choose`() {
+        val (service, repo) = serviceAs(callerId = 1)
+
+        val created = service.create(CreateAdminCommand("new@example.com", "New Person", "ADMIN"))
+
+        assertTrue(created.admin.mustChangePassword)
+        assertTrue(repo.findById(created.admin.id!!)!!.mustChangePassword)
+    }
+
+    /**
+     * The first super admin is created by hand at deploy time, before there is anyone to
+     * enforce a change on them.
+     */
+    @Test
+    fun `a super admin is not forced to change theirs`() {
+        val (service, _) = serviceAs(callerId = 1)
+
+        val created = service.create(CreateAdminCommand("second@example.com", "Second", "SUPER_ADMIN"))
+
+        assertFalse(created.admin.mustChangePassword)
+    }
+
+    @Test
+    fun `changing your own password ends the forced change`() {
+        val forced = AdminUser(
+            5, Email.of("forced@example.com"), PasswordHash("hashed:Issued12345"),
+            "Forced", AdminRole.ADMIN, mustChangePassword = true,
+        )
+        val (service, repo) = serviceAs(callerId = 5, seed = listOf(owner, forced))
+
+        service.changeOwnPassword(ChangeAdminPasswordCommand("Issued12345", "Chosen98765"))
+
+        assertFalse(repo.findById(5)!!.mustChangePassword)
+    }
+
+    // ---- reset ------------------------------------------------------------------------
+
+    @Test
+    fun `a super admin resets another admin's password and gets it once`() {
+        val (service, repo) = serviceAs(callerId = 1)
+
+        val reset = service.resetPassword(2)
+
+        assertEquals("TempPass1234", reset.temporaryPassword)
+        val stored = repo.findById(2)!!
+        assertEquals("hashed:TempPass1234", stored.passwordHash.value)
+        // Put back on a forced change, so the password just handed out reaches one screen.
+        assertTrue(stored.mustChangePassword)
+    }
+
+    @Test
+    fun `a plain admin cannot reset anyone's password`() {
+        val (service, repo) = serviceAs(callerId = 2)
+
+        assertFailsWith<NotPermitted> { service.resetPassword(1) }
+        assertEquals("hashed:Secret12345", repo.findById(1)!!.passwordHash.value)
+    }
+
+    /** Resetting your own would leave you holding a password you then have to be told. */
+    @Test
+    fun `resetting your own account is refused, with somewhere else to go`() {
+        val (service, _) = serviceAs(callerId = 1)
+
+        val failure = assertFailsWith<UseCaseViolation> { service.resetPassword(1) }
+
+        assertTrue(failure.message!!.contains("change password", ignoreCase = true))
+    }
+
+    @Test
+    fun `resetting someone who does not exist is a not-found`() {
+        val (service, _) = serviceAs(callerId = 1)
+
+        assertFailsWith<NoSuchElementException> { service.resetPassword(999) }
     }
 
     @Test
