@@ -3,6 +3,7 @@ package com.acme.b2b.application.catalog
 import com.acme.b2b.application.catalog.dto.*
 import com.acme.b2b.domain.catalog.Category
 import com.acme.b2b.domain.catalog.Product
+import com.acme.b2b.domain.catalog.ProductImageRef
 import com.acme.b2b.domain.catalog.ProductVariant
 import com.acme.b2b.domain.pricing.ResolvedPrice
 
@@ -46,15 +47,26 @@ object ProductAssembler {
                     isPrimary = id == product.primaryCategoryId,
                 )
             },
-            images = product.imageUrls.mapIndexed { index, url ->
-                ProductImageDTO(id = null, url = url, altText = product.name, sortOrder = index)
+            images = product.images.mapIndexed { index, image ->
+                ProductImageDTO(
+                    id = image.id,
+                    url = image.url,
+                    // The product's name when the image carries no words of its own: a
+                    // screen reader saying "image" tells a dealer nothing.
+                    altText = image.altText ?: product.name,
+                    sortOrder = index,
+                )
             },
             variants = variants.map { variant ->
-                toDTO(variant, prices.getValue(variant.sku.value))
+                toDTO(variant, prices.getValue(variant.sku.value), product.images)
             },
         )
 
-    private fun toDTO(variant: ProductVariant, price: ResolvedPrice): VariantDTO =
+    private fun toDTO(
+        variant: ProductVariant,
+        price: ResolvedPrice,
+        gallery: List<ProductImageRef>,
+    ): VariantDTO =
         VariantDTO(
             id = variant.id,
             sku = variant.sku.value,
@@ -66,6 +78,9 @@ object ProductAssembler {
             tierPrice = price.forOneSku.amount,
             unitPrice = price.perUnit.amount,
             mapPrice = variant.mapPrice?.amount,
+            mainImageId = variant.mainImageId,
+            mainImageUrl = gallery.firstOrNull { it.id == variant.mainImageId }?.url
+                ?: gallery.firstOrNull()?.url,
             inventory = InventoryDTO(
                 availableStock = variant.stock.available,
                 incomingStock = variant.stock.incoming,

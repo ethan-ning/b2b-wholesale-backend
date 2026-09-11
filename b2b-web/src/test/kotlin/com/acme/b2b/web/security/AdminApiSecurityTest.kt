@@ -1,6 +1,7 @@
 package com.acme.b2b.web.security
 
 import com.acme.b2b.application.admin.AdminAccountService
+import com.acme.b2b.application.admin.ImageAdminService
 import com.acme.b2b.application.admin.AdminAuthService
 import com.acme.b2b.application.admin.CategoryAdminService
 import com.acme.b2b.application.admin.CustomerAdminService
@@ -69,6 +70,7 @@ class AdminApiSecurityTest {
     @MockitoBean private lateinit var adminAuth: AdminAuthService
     @MockitoBean private lateinit var customers: CustomerAdminService
     @MockitoBean private lateinit var adminAccounts: AdminAccountService
+    @MockitoBean private lateinit var imageAdmin: ImageAdminService
 
     /**
      * Not exercised here, but the whole routing table loads, so every controller's
@@ -187,6 +189,7 @@ class AdminApiSecurityTest {
             "/api/admin/categories",
             "/api/admin/inventory",
             "/api/admin/admins",
+            "/api/admin/images",
         ).forEach { path ->
             mockMvc.perform(get(path).header("Authorization", "Bearer $dealerToken"))
                 .andExpect(status().isForbidden)

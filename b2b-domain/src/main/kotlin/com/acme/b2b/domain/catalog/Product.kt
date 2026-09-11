@@ -31,7 +31,7 @@ class Product(
     val visibility: ProductVisibility,
     val categoryIds: List<Long>,
     val primaryCategoryId: Long?,
-    val imageUrls: List<String>,
+    val images: List<ProductImageRef>,
     variants: List<ProductVariant>,
 ) {
     val variants: List<ProductVariant> = variants.sortedBy { it.sortOrder }
@@ -80,7 +80,7 @@ class Product(
      */
     fun withVisibility(visibility: ProductVisibility) = Product(
         id, spuCode, name, brand, description, baseWholesalePrice, locationCode, variantAxis,
-        attributes, visibility, categoryIds, primaryCategoryId, imageUrls, variants,
+        attributes, visibility, categoryIds, primaryCategoryId, images, variants,
     )
 
     /**
@@ -94,7 +94,7 @@ class Product(
             id, spuCode, name, brand, description, baseWholesalePrice, locationCode, variantAxis,
             attributes, visibility, remaining,
             if (primaryCategoryId == categoryId) remaining.firstOrNull() else primaryCategoryId,
-            imageUrls, variants,
+            images, variants,
         )
     }
 

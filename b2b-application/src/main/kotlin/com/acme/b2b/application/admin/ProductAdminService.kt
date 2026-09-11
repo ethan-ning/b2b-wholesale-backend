@@ -121,7 +121,9 @@ class ProductAdminService(
             visibility = parseVisibility(command.visibility),
             categoryIds = command.categoryIds,
             primaryCategoryId = command.primaryCategoryId,
-            imageUrls = command.imageUrls,
+            // Not from the command: a product's gallery is attached and ordered through
+            // the image endpoints, so a save must leave it exactly as it found it.
+            images = existing.images,
             variants = existing.variants.map { variant ->
                 applyMapPrice(variant, command.variantMapPrices)
             },

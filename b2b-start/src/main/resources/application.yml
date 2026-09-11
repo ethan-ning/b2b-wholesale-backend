@@ -27,6 +27,13 @@ spring:
       hibernate:
         jdbc.time_zone: UTC
 
+  servlet:
+    multipart:
+      # Slightly above the 5 MB the use case allows, so an oversized upload is refused by
+      # the rule that can explain itself rather than by the container.
+      max-file-size: 6MB
+      max-request-size: 6MB
+
   flyway:
     enabled: true
     # Migrations ship in b2b-infrastructure, beside the DOs whose tables they create.

@@ -56,7 +56,7 @@ class WebSecurityConfig(
                     // /brand/** what it copies through untouched.
                     .requestMatchers(
                         HttpMethod.GET,
-                        "/", "/index.html", "/favicon.svg", "/assets/**", "/brand/**",
+                        "/", "/index.html", "/favicon.svg", "/assets/**", "/brand/**", "/local-images/**",
                         "/login", "/change-password", "/search", "/products/**", "/admin/**",
                     ).permitAll()
                     // Anyone still on a password somebody else generated holds a token whose

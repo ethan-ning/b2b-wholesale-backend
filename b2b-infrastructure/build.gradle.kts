@@ -31,6 +31,9 @@ dependencies {
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    // Object storage for product images. The domain sees only the ImageStore port.
+    implementation(platform("com.google.cloud:libraries-bom:26.50.0"))
+    implementation("com.google.cloud:google-cloud-storage")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("com.h2database:h2")

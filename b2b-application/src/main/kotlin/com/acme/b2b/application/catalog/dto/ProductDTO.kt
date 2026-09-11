@@ -48,6 +48,14 @@ data class VariantDTO(
     /** tierPrice / packQuantity, so a pack compares against a single. */
     val unitPrice: BigDecimal,
     val mapPrice: BigDecimal?,
+    /** Which of the product's images stands for this SKU, or null if nobody has chosen one. */
+    val mainImageId: Long?,
+    /**
+     * What to render for this SKU in a list. Falls back to the product's first image, so a
+     * search result is never a blank square — [mainImageId] is the one that says whether a
+     * choice was actually made.
+     */
+    val mainImageUrl: String?,
     val inventory: InventoryDTO,
 )
 

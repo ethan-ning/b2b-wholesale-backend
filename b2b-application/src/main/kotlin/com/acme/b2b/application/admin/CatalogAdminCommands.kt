@@ -12,7 +12,6 @@ data class UpdateProductCommand(
     val locationCode: String?,
     val visibility: String,
     val attributes: Map<String, String> = emptyMap(),
-    val imageUrls: List<String> = emptyList(),
     val categoryIds: List<Long> = emptyList(),
     val primaryCategoryId: Long? = null,
     /** MAP is ours, so it is the one variant field an admin may set. */

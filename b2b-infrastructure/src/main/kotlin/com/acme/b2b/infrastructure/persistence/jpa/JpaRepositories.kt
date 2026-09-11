@@ -75,6 +75,7 @@ interface VariantWarehouseStockJpaRepository : JpaRepository<VariantWarehouseSto
 }
 
 interface ProductVariantJpaRepository : JpaRepository<ProductVariantDO, Long> {
+    fun findByProductId(productId: Long): List<ProductVariantDO>
 
     /** Products of this source that still hold a SKU. Asked of the database, not of ProductDO.variants. */
     @Query("SELECT DISTINCT v.product.id FROM ProductVariantDO v WHERE v.product.source = :source")
@@ -174,4 +175,15 @@ interface SellfoxSyncRunJpaRepository : JpaRepository<SellfoxSyncRunDO, Long> {
     fun existsByStatus(status: String): Boolean
     fun findByStatus(status: String): List<SellfoxSyncRunDO>
     fun findByStatusAndStartedAtBefore(status: String, startedAt: java.time.Instant): List<SellfoxSyncRunDO>
+}
+
+interface ImageJpaRepository : JpaRepository<ImageDO, Long> {
+    fun findByObjectKey(objectKey: String): ImageDO?
+}
+
+interface ProductImageJpaRepository : JpaRepository<ProductImageDO, Long> {
+    fun findByProductIdOrderBySortOrderAsc(productId: Long): List<ProductImageDO>
+    fun findByImageId(imageId: Long): List<ProductImageDO>
+    fun countByProductId(productId: Long): Long
+    fun findByProductIdAndImageId(productId: Long, imageId: Long): ProductImageDO?
 }

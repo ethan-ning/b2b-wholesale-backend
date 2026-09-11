@@ -222,3 +222,96 @@ class InMemoryStockBreakdownRepository(
 ) : VariantStockBreakdownRepository {
     override fun findBySkus(skus: List<String>) = lines.filter { it.sku in skus }
 }
+
+/** A product with one SKU whose id is known, for the image rules that turn on SKU identity. */
+fun productWith(id: Long, spuCode: String, variantId: Long = 11) = Product(
+    id = id,
+    spuCode = SpuCode(spuCode),
+    name = "Product $spuCode",
+    brand = null,
+    description = null,
+    baseWholesalePrice = Money.of("10.00"),
+    locationCode = null,
+    variantAxis = null,
+    attributes = emptyMap(),
+    visibility = ProductVisibility.VISIBLE,
+    categoryIds = emptyList(),
+    primaryCategoryId = null,
+    images = emptyList(),
+    variants = listOf(
+        ProductVariant(
+            id = variantId,
+            sku = SkuCode("$spuCode-A"),
+            variantValue = null,
+            packQuantity = PackQuantity(1),
+            mapPrice = null,
+            upc = null,
+            weight = null,
+            sortOrder = 0,
+            active = true,
+            stock = StockLevel(5, 0, java.time.Instant.EPOCH),
+        )
+    ),
+)
+
+class InMemoryImageRepository : ImageRepository {
+    private val rows = mutableMapOf<Long, Image>()
+    private var nextId = 1L
+    /** Set by the gallery fake, so usage can be answered without a database. */
+    var attachments: () -> Map<Long, List<UsedBy>> = { emptyMap() }
+
+    override fun findById(id: Long) = rows[id]
+    override fun findByObjectKey(objectKey: String) = rows.values.firstOrNull { it.objectKey == objectKey }
+    override fun deleteById(id: Long) { rows.remove(id) }
+
+    override fun save(image: Image): Image {
+        val id = image.id ?: nextId++
+        val stored = image.copy(id = id, uploadedAt = image.uploadedAt ?: java.time.Instant.EPOCH)
+        rows[id] = stored
+        return stored
+    }
+
+    override fun findAllWithUsage(): List<ImageUsage> {
+        val usage = attachments()
+        return rows.values.map { ImageUsage(it, usage[it.id].orEmpty()) }
+    }
+
+    override fun usageOf(imageId: Long): List<UsedBy> = attachments()[imageId].orEmpty()
+}
+
+class InMemoryProductImageRepository(
+    private val images: InMemoryImageRepository,
+    private val products: InMemoryProductRepository = InMemoryProductRepository(),
+) : ProductImageRepository {
+    /** productId -> image ids, in gallery order. */
+    private val galleries = mutableMapOf<Long, MutableList<Long>>()
+    private val mainImages = mutableMapOf<Long, Long?>()
+
+    init {
+        images.attachments = {
+            galleries.flatMap { (productId, ids) ->
+                val product = products.findById(productId)
+                val usedBy = UsedBy(productId, product?.spuCode?.value ?: "", product?.name ?: "")
+                ids.map { it to usedBy }
+            }.groupBy({ it.first }, { it.second })
+        }
+    }
+
+    fun mainImageOf(variantId: Long): Long? = mainImages[variantId]
+
+    override fun imagesOf(productId: Long) = galleries[productId].orEmpty().mapNotNull { images.findById(it) }
+    override fun countFor(productId: Long) = galleries[productId].orEmpty().size
+    override fun isAttached(productId: Long, imageId: Long) = imageId in galleries[productId].orEmpty()
+    override fun attach(productId: Long, imageId: Long) { galleries.getOrPut(productId) { mutableListOf() } += imageId }
+    override fun detach(productId: Long, imageId: Long) { galleries[productId]?.remove(imageId) }
+
+    override fun reorder(productId: Long, imageIdsInOrder: List<Long>) {
+        galleries[productId] = imageIdsInOrder.toMutableList()
+    }
+
+    override fun setMainImage(variantId: Long, imageId: Long?) { mainImages[variantId] = imageId }
+
+    override fun clearMainImage(productId: Long, imageId: Long) {
+        mainImages.keys.filter { mainImages[it] == imageId }.forEach { mainImages[it] = null }
+    }
+}

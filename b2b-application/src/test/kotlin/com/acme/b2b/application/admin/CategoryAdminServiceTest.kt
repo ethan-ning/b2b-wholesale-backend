@@ -34,7 +34,7 @@ class CategoryAdminServiceTest {
         visibility = ProductVisibility.VISIBLE,
         categoryIds = categoryIds,
         primaryCategoryId = primary,
-        imageUrls = emptyList(),
+        images = emptyList(),
         variants = listOf(
             ProductVariant(
                 id = null,

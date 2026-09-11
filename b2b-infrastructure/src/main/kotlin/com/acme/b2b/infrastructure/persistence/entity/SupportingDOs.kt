@@ -2,7 +2,39 @@ package com.acme.b2b.infrastructure.persistence.entity
 
 import jakarta.persistence.*
 import java.math.BigDecimal
+import java.time.Instant
 
+/** The library. A row here outlives every product that happens to show it. */
+@Entity
+@Table(name = "image")
+class ImageDO(
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(nullable = false, columnDefinition = "text")
+    var url: String = "",
+
+    @Column(name = "object_key")
+    var objectKey: String? = null,
+
+    @Column(nullable = false)
+    var filename: String = "",
+
+    @Column(name = "content_type")
+    var contentType: String? = null,
+
+    var bytes: Long? = null,
+    var width: Int? = null,
+    var height: Int? = null,
+
+    @Column(name = "alt_text")
+    var altText: String? = null,
+
+    @Column(name = "uploaded_at")
+    var uploadedAt: Instant? = null,
+)
+
+/** Which products show which images, and in what order. */
 @Entity
 @Table(name = "product_image")
 class ProductImageDO(
@@ -13,11 +45,9 @@ class ProductImageDO(
     @JoinColumn(name = "product_id", nullable = false)
     var product: ProductDO? = null,
 
-    @Column(nullable = false, columnDefinition = "text")
-    var url: String = "",
-
-    @Column(name = "alt_text")
-    var altText: String? = null,
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "image_id", nullable = false)
+    var image: ImageDO? = null,
 
     @Column(name = "sort_order", nullable = false)
     var sortOrder: Int = 0,

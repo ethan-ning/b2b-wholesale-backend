@@ -24,6 +24,8 @@ class ProductVariant(
     val sortOrder: Int,
     val active: Boolean,
     val stock: StockLevel,
+    /** Which of the product's images stands for this SKU. Null until someone picks one. */
+    val mainImageId: Long? = null,
 ) {
     /**
      * Per-unit view of a price stated for this SKU. A 6-pack at $93.60 is $15.60/ea —

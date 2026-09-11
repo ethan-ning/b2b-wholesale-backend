@@ -1,5 +1,6 @@
 package com.acme.b2b.infrastructure.persistence.converter
 
+import com.acme.b2b.domain.catalog.ProductImageRef
 import com.acme.b2b.domain.catalog.*
 import com.acme.b2b.infrastructure.persistence.entity.*
 import com.acme.b2b.types.*
@@ -29,7 +30,9 @@ class ProductDataConverter {
         visibility = ProductVisibility.valueOf(row.visibility),
         categoryIds = row.categories.map { it.categoryId },
         primaryCategoryId = row.categories.firstOrNull { it.isPrimary }?.categoryId,
-        imageUrls = row.images.sortedBy { it.sortOrder }.map { it.url },
+        images = row.images.sortedBy { it.sortOrder }.mapNotNull { link ->
+            link.image?.let { ProductImageRef(it.id!!, it.url, it.altText) }
+        },
         variants = row.variants.map { toDomain(it) },
     )
 
@@ -40,6 +43,7 @@ class ProductDataConverter {
         packQuantity = PackQuantity(row.packQuantity),
         mapPrice = row.mapPrice?.let { Money.of(it) },
         upc = row.upc,
+        mainImageId = row.mainImageId,
         weight = row.weight,
         sortOrder = row.sortOrder,
         active = row.status == "ACTIVE",

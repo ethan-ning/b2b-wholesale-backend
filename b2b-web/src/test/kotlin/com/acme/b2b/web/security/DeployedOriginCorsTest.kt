@@ -1,6 +1,7 @@
 package com.acme.b2b.web.security
 
 import com.acme.b2b.application.admin.AdminAccountService
+import com.acme.b2b.application.admin.ImageAdminService
 import com.acme.b2b.application.admin.AdminAuthService
 import com.acme.b2b.application.admin.CategoryAdminService
 import com.acme.b2b.application.admin.CustomerAdminService
@@ -50,6 +51,7 @@ class DeployedOriginCorsTest {
     // The whole routing table loads, so every controller's dependencies must resolve.
     @MockitoBean private lateinit var customers: CustomerAdminService
     @MockitoBean private lateinit var adminAccounts: AdminAccountService
+    @MockitoBean private lateinit var imageAdmin: ImageAdminService
     @MockitoBean private lateinit var catalog: CatalogQueryService
     @MockitoBean private lateinit var productAdmin: ProductAdminService
     @MockitoBean private lateinit var categoryAdmin: CategoryAdminService

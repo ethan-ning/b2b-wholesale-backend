@@ -47,7 +47,7 @@ object ProductFixtures {
         visibility = ProductVisibility.VISIBLE,
         categoryIds = categoryIds,
         primaryCategoryId = primaryCategoryId,
-        imageUrls = emptyList(),
+        images = emptyList(),
         variants = variants,
     )
 }

@@ -67,7 +67,7 @@ class ProductAdminServiceTest {
         visibility = visibility,
         categoryIds = categoryIds,
         primaryCategoryId = primaryCategoryId,
-        imageUrls = emptyList(),
+        images = emptyList(),
         variants = variants,
     )
 

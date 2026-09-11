@@ -110,7 +110,7 @@ jobs:
             --min-instances=1 --no-cpu-throttling \
             --memory=1Gi --cpu=1 --timeout=300 \
             --vpc-egress=all-traffic --network=b2b --subnet=b2b \
-            --set-env-vars="^@^DB_URL=jdbc:postgresql:///b2b?cloudSqlInstance=$SQL&socketFactory=com.google.cloud.sql.postgres.SocketFactory@DB_USER=b2b@SELLFOX_SCHEDULE_ENABLED=true@APP_CORS_ALLOWED_ORIGINS=$ORIGINS" \
+            --set-env-vars="^@^DB_URL=jdbc:postgresql:///b2b?cloudSqlInstance=$SQL&socketFactory=com.google.cloud.sql.postgres.SocketFactory@DB_USER=b2b@SELLFOX_SCHEDULE_ENABLED=true@APP_CORS_ALLOWED_ORIGINS=$ORIGINS@APP_IMAGES_BUCKET=woltaphor-b2b-images" \
             --set-secrets="DB_PASSWORD=b2b-db-password:latest,JWT_SECRET=b2b-jwt-secret:latest,SELLFOX_APP_ID=sellfox-app-id:latest,SELLFOX_APP_SECRET=sellfox-app-secret:latest"
 
       - name: Check it answers

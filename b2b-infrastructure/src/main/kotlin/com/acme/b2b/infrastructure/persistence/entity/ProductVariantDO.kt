@@ -46,6 +46,9 @@ class ProductVariantDO(
     @Column(name = "incoming_stock", nullable = false)
     var incomingStock: Int = 0,
 
+    @Column(name = "main_image_id")
+    var mainImageId: Long? = null,
+
     @Column(name = "stock_synced_at")
     var stockSyncedAt: Instant? = null,
 )
