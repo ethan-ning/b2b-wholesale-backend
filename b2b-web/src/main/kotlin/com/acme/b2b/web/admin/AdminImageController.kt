@@ -25,7 +25,7 @@ class AdminImageController(
         @RequestParam(required = false) search: String?,
         @RequestParam(defaultValue = "false") unusedOnly: Boolean,
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "24") size: Int,
+        @RequestParam(defaultValue = "20") size: Int,
     ): ImageLibraryDTO = images.library(search, unusedOnly, Page(page, size))
 
     @PostMapping("/images")
