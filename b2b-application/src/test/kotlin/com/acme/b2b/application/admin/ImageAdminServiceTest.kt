@@ -1,6 +1,7 @@
 package com.acme.b2b.application.admin
 
 import com.acme.b2b.application.support.UseCaseViolation
+import com.acme.b2b.domain.common.Page
 import com.acme.b2b.domain.catalog.Image
 import com.acme.b2b.domain.catalog.ImageRules
 import com.acme.b2b.domain.catalog.ImageStore
@@ -265,18 +266,81 @@ class ImageAdminServiceTest {
 
     // ---- the library screen -----------------------------------------------------------
 
+    private fun library(search: String? = null, unusedOnly: Boolean = false, size: Int = 20) =
+        service.library(search, unusedOnly, Page(0, size))
+
     @Test
     fun `the library says what uses each image and whether it can go`() {
         val used = upload("used.png")
         val spare = upload("spare.png")
         service.attach(1, used.id!!)
 
-        val library = service.library().associateBy { it.image.filename }
+        val rows = library().content.associateBy { it.image.filename }
 
-        assertEquals(listOf("SPU-1"), library.getValue("used.png").usedBy.map { it.spuCode })
-        assertFalse(library.getValue("used.png").deletable)
-        assertTrue(library.getValue("spare.png").usedBy.isEmpty())
-        assertTrue(library.getValue("spare.png").deletable)
-        assertEquals(spare.id, library.getValue("spare.png").image.id)
+        assertEquals(listOf("SPU-1"), rows.getValue("used.png").usedBy.map { it.spuCode })
+        assertFalse(rows.getValue("used.png").deletable)
+        assertTrue(rows.getValue("spare.png").usedBy.isEmpty())
+        assertTrue(rows.getValue("spare.png").deletable)
+        assertEquals(spare.id, rows.getValue("spare.png").image.id)
+    }
+
+    /**
+     * A screenful, not the catalogue. Fetching every row to show twenty of them made the
+     * first paint wait on a few hundred kilobytes of JSON.
+     */
+    @Test
+    fun `the library comes back one page at a time`() {
+        repeat(7) { upload("p$it.png") }
+
+        val first = library(size = 3)
+
+        assertEquals(3, first.content.size)
+        assertEquals(7, first.totalElements)
+        assertEquals(3, first.totalPages)
+
+        val second = service.library(null, false, Page(1, 3))
+        assertEquals(3, second.content.size)
+        // Different images, not the same page again.
+        assertTrue((first.content.map { it.image.id } intersect second.content.map { it.image.id }.toSet()).isEmpty())
+    }
+
+    /**
+     * Searching has to reach the whole library, not the page on screen — a filter that
+     * only searched what was already fetched would report "no matches" for anything on
+     * page two.
+     */
+    @Test
+    fun `searching looks past the current page`() {
+        repeat(5) { upload("filler$it.png") }
+        val needle = upload("hubcap-dome.png")
+
+        val found = library(search = "hubcap", size = 3)
+
+        assertEquals(1, found.totalElements)
+        assertEquals(needle.id, found.content.single().image.id)
+    }
+
+    @Test
+    fun `searching finds an image by the product showing it`() {
+        val image = upload("anonymous.png")
+        service.attach(1, image.id!!)
+        upload("unrelated.png")
+
+        assertEquals(listOf(image.id), library(search = "SPU-1").content.map { it.image.id })
+    }
+
+    @Test
+    fun `the unused filter and its count are about the whole library, not the page`() {
+        val used = upload("used.png")
+        service.attach(1, used.id!!)
+        repeat(4) { upload("spare$it.png") }
+
+        val page = library(unusedOnly = true, size = 2)
+
+        assertEquals(2, page.content.size)
+        assertEquals(4, page.totalElements)
+        // Counted across everything, so it still reads 4 on a page holding 2.
+        assertEquals(4, page.unusedCount)
+        assertTrue(page.content.all { it.deletable })
     }
 }

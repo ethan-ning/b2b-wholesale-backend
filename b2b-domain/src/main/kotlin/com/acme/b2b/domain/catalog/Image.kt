@@ -1,5 +1,7 @@
 package com.acme.b2b.domain.catalog
 
+import com.acme.b2b.domain.common.Page
+import com.acme.b2b.domain.common.PageOf
 import java.time.Instant
 
 /**
@@ -54,14 +56,32 @@ object ImageRules {
     val ALLOWED_CONTENT_TYPES = setOf("image/jpeg", "image/png", "image/webp")
 }
 
+/**
+ * What the library screen is asking for.
+ *
+ * [term] matches an image by its filename or by any product showing it, because "which
+ * images belong to this SPU" is the other question the screen exists to answer.
+ */
+data class ImageSearch(val term: String? = null, val unusedOnly: Boolean = false)
+
 interface ImageRepository {
     fun findById(id: Long): Image?
     fun findByObjectKey(objectKey: String): Image?
     fun save(image: Image): Image
     fun deleteById(id: Long)
 
-    /** The library screen: every image, and which products show it. */
-    fun findAllWithUsage(): List<ImageUsage>
+    /**
+     * One screenful of the library, with what is keeping each image alive.
+     *
+     * Paged in the query rather than in memory. A catalogue's worth of pictures is a few
+     * hundred kilobytes of JSON and every row carries its usage, so fetching the lot to
+     * show twenty of them makes the first paint wait on all of it.
+     */
+    fun findPageWithUsage(search: ImageSearch, page: Page): PageOf<ImageUsage>
+
+    /** How many images nothing shows — the ones that can actually be deleted. */
+    fun countUnused(): Long
+
     fun usageOf(imageId: Long): List<UsedBy>
 }
 

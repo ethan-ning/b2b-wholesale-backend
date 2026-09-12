@@ -271,9 +271,24 @@ class InMemoryImageRepository : ImageRepository {
         return stored
     }
 
-    override fun findAllWithUsage(): List<ImageUsage> {
+    override fun findPageWithUsage(search: ImageSearch, page: Page): PageOf<ImageUsage> {
         val usage = attachments()
-        return rows.values.map { ImageUsage(it, usage[it.id].orEmpty()) }
+        val term = search.term?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        val all = rows.values
+            .sortedByDescending { it.id }
+            .map { ImageUsage(it, usage[it.id].orEmpty()) }
+            .filter { !search.unusedOnly || it.products.isEmpty() }
+            .filter { row ->
+                term == null
+                    || row.image.filename.lowercase().contains(term)
+                    || row.products.any { "${it.spuCode} ${it.name}".lowercase().contains(term) }
+            }
+        return PageOf.of(all, page)
+    }
+
+    override fun countUnused(): Long {
+        val usage = attachments()
+        return rows.values.count { usage[it.id].isNullOrEmpty() }.toLong()
     }
 
     override fun usageOf(imageId: Long): List<UsedBy> = attachments()[imageId].orEmpty()

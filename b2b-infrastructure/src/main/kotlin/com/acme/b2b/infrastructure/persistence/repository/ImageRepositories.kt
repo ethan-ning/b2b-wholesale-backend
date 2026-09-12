@@ -2,15 +2,19 @@ package com.acme.b2b.infrastructure.persistence.repository
 
 import com.acme.b2b.domain.catalog.Image
 import com.acme.b2b.domain.catalog.ImageRepository
+import com.acme.b2b.domain.catalog.ImageSearch
 import com.acme.b2b.domain.catalog.ImageUsage
 import com.acme.b2b.domain.catalog.ProductImageRepository
 import com.acme.b2b.domain.catalog.UsedBy
+import com.acme.b2b.domain.common.Page
+import com.acme.b2b.domain.common.PageOf
 import com.acme.b2b.infrastructure.persistence.entity.ImageDO
 import com.acme.b2b.infrastructure.persistence.entity.ProductImageDO
 import com.acme.b2b.infrastructure.persistence.jpa.ImageJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.ProductImageJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.ProductJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.ProductVariantJpaRepository
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -42,18 +46,29 @@ class ImageRepositoryImpl(
     override fun deleteById(id: Long) = jpa.deleteById(id)
 
     /**
-     * Every image with the products showing it, in one pass rather than a usage query per
-     * row — the library is a single screen and a hundred images would be a hundred trips.
+     * One page of images with the products showing them: the window is chosen in the
+     * query, then usage is fetched for that page's ids in a single trip rather than one
+     * per row.
      */
-    override fun findAllWithUsage(): List<ImageUsage> {
-        val usageByImage = links.findAll()
+    override fun findPageWithUsage(search: ImageSearch, page: Page): PageOf<ImageUsage> {
+        val term = search.term?.trim()?.takeIf { it.isNotEmpty() }?.let { "%${it.lowercase()}%" }
+        val found = jpa.search(term, search.unusedOnly, PageRequest.of(page.number, page.size))
+
+        val ids = found.content.mapNotNull { it.id }
+        val usageByImage = if (ids.isEmpty()) emptyMap() else links.findByImageIdIn(ids)
             .mapNotNull { link -> link.image?.id?.let { it to link } }
             .groupBy({ it.first }, { it.second })
 
-        return jpa.findAll()
-            .sortedByDescending { it.uploadedAt ?: Instant.EPOCH }
-            .map { row -> ImageUsage(toDomain(row), usageByImage[row.id].orEmpty().map(::toUsedBy)) }
+        return PageOf(
+            content = found.content.map { row ->
+                ImageUsage(toDomain(row), usageByImage[row.id].orEmpty().map(::toUsedBy))
+            },
+            totalElements = found.totalElements,
+            page = page,
+        )
     }
+
+    override fun countUnused(): Long = jpa.countUnused()
 
     override fun usageOf(imageId: Long): List<UsedBy> = links.findByImageId(imageId).map(::toUsedBy)
 

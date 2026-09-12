@@ -4,6 +4,7 @@ import com.acme.b2b.infrastructure.persistence.entity.*
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.domain.Page as SpringPage
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.query.Param
 
@@ -179,11 +180,38 @@ interface SellfoxSyncRunJpaRepository : JpaRepository<SellfoxSyncRunDO, Long> {
 
 interface ImageJpaRepository : JpaRepository<ImageDO, Long> {
     fun findByObjectKey(objectKey: String): ImageDO?
+
+    /**
+     * The library screen's query. Both filters are expressed as EXISTS against the link
+     * table rather than a join, so an image used by six products is still one row.
+     */
+    @Query(
+        """
+        SELECT i FROM ImageDO i
+        WHERE (:unusedOnly = FALSE
+               OR NOT EXISTS (SELECT 1 FROM ProductImageDO pi WHERE pi.image = i))
+          AND (:term IS NULL
+               OR LOWER(i.filename) LIKE :term
+               OR EXISTS (SELECT 1 FROM ProductImageDO pi2 WHERE pi2.image = i
+                          AND (LOWER(pi2.product.spuCode) LIKE :term
+                               OR LOWER(pi2.product.name) LIKE :term)))
+        ORDER BY i.uploadedAt DESC, i.id DESC
+        """
+    )
+    fun search(
+        @Param("term") term: String?,
+        @Param("unusedOnly") unusedOnly: Boolean,
+        pageable: Pageable,
+    ): SpringPage<ImageDO>
+
+    @Query("SELECT COUNT(i) FROM ImageDO i WHERE NOT EXISTS (SELECT 1 FROM ProductImageDO pi WHERE pi.image = i)")
+    fun countUnused(): Long
 }
 
 interface ProductImageJpaRepository : JpaRepository<ProductImageDO, Long> {
     fun findByProductIdOrderBySortOrderAsc(productId: Long): List<ProductImageDO>
     fun findByImageId(imageId: Long): List<ProductImageDO>
+    fun findByImageIdIn(imageIds: Collection<Long>): List<ProductImageDO>
     fun countByProductId(productId: Long): Long
     fun findByProductIdAndImageId(productId: Long, imageId: Long): ProductImageDO?
 }

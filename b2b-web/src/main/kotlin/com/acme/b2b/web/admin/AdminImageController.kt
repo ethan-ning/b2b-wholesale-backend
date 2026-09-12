@@ -2,7 +2,8 @@ package com.acme.b2b.web.admin
 
 import com.acme.b2b.application.admin.ImageAdminService
 import com.acme.b2b.application.admin.dto.ImageDTO
-import com.acme.b2b.application.admin.dto.ImageUsageDTO
+import com.acme.b2b.application.admin.dto.ImageLibraryDTO
+import com.acme.b2b.domain.common.Page
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
@@ -20,7 +21,12 @@ class AdminImageController(
 ) {
 
     @GetMapping("/images")
-    fun library(): List<ImageUsageDTO> = images.library()
+    fun library(
+        @RequestParam(required = false) search: String?,
+        @RequestParam(defaultValue = "false") unusedOnly: Boolean,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "24") size: Int,
+    ): ImageLibraryDTO = images.library(search, unusedOnly, Page(page, size))
 
     @PostMapping("/images")
     fun upload(@RequestParam("file") file: MultipartFile): ResponseEntity<ImageDTO> =

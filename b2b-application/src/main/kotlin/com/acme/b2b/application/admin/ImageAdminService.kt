@@ -1,16 +1,19 @@
 package com.acme.b2b.application.admin
 
 import com.acme.b2b.application.admin.dto.ImageDTO
+import com.acme.b2b.application.admin.dto.ImageLibraryDTO
 import com.acme.b2b.application.admin.dto.ImageUsageDTO
 import com.acme.b2b.application.admin.dto.UsedByDTO
 import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.catalog.Image
 import com.acme.b2b.domain.catalog.ImageRepository
+import com.acme.b2b.domain.catalog.ImageSearch
 import com.acme.b2b.domain.catalog.ImageRules
 import com.acme.b2b.domain.catalog.ImageStore
 import com.acme.b2b.domain.catalog.ImageUsage
 import com.acme.b2b.domain.catalog.ProductImageRepository
 import com.acme.b2b.domain.catalog.ProductRepository
+import com.acme.b2b.domain.common.Page
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -29,7 +32,17 @@ class ImageAdminService(
     private val store: ImageStore,
 ) {
 
-    fun library(): List<ImageUsageDTO> = images.findAllWithUsage().map(::toDTO)
+    fun library(search: String?, unusedOnly: Boolean, page: Page): ImageLibraryDTO {
+        val found = images.findPageWithUsage(ImageSearch(search, unusedOnly), page)
+        return ImageLibraryDTO(
+            content = found.content.map(::toDTO),
+            totalElements = found.totalElements,
+            totalPages = found.totalPages,
+            page = page.number,
+            size = page.size,
+            unusedCount = images.countUnused(),
+        )
+    }
 
     @Transactional
     fun upload(content: ByteArray, contentType: String?, filename: String?): ImageDTO {
