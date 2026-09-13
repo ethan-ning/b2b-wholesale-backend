@@ -41,8 +41,8 @@ class PricingPolicyTest {
         val prices = book(defaultPrice("18.00"), TierPrice(sku.sku, gold.id, Money.of("12.00")))
 
         val resolved = PricingPolicy.resolve(sku, gold, prices, default)!!
+        // Twelve, not the 14.76 the discount would have given — so this is the stated one.
         assertEquals(Money.of("12.00"), resolved.forOneSku)
-        assertEquals(PriceSource.STATED, resolved.source)
         // And what it departed from is still knowable, for a screen to show beside it.
         assertEquals(Money.of("14.76"), PricingPolicy.standardPrice(sku, gold, prices, default))
     }

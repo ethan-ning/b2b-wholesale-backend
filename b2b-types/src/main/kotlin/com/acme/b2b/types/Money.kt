@@ -19,8 +19,6 @@ class Money private constructor(val amount: BigDecimal) : Comparable<Money> {
         return of(amount.divide(divisor.toBigDecimal(), 2, RoundingMode.HALF_UP))
     }
 
-    fun isZero() = amount.compareTo(BigDecimal.ZERO) == 0
-
     /**
      * This price with [discount] taken off, rounded to the cent.
      *

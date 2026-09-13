@@ -223,9 +223,6 @@ class InMemoryTierPriceRepository(seed: List<TierPrice> = emptyList()) : TierPri
 
     override fun findAllFor(skus: Collection<SkuCode>) = rows.filter { it.sku in skus }
 
-    override fun findFor(skus: Collection<SkuCode>, tierId: TierId) =
-        rows.filter { it.sku in skus && it.tierId == tierId }
-
     override fun replaceFor(sku: SkuCode, prices: List<TierPrice>) {
         rows.removeAll { it.sku == sku }
         rows += prices

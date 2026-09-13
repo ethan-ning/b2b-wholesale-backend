@@ -120,7 +120,6 @@ interface CategoryJpaRepository : JpaRepository<CategoryDO, Long> {
 }
 
 interface ProductCategoryJpaRepository : JpaRepository<ProductCategoryDO, Long> {
-    fun findByCategoryIdIn(categoryIds: Collection<Long>): List<ProductCategoryDO>
 
     /** (categoryId, productId) pairs. Reads the FK column; no join to product. */
     @Query("SELECT pc.categoryId, pc.product.id FROM ProductCategoryDO pc")
@@ -174,7 +173,6 @@ interface SellfoxSkuLinkJpaRepository : JpaRepository<SellfoxSkuLinkDO, String>
 interface SellfoxSyncRunJpaRepository : JpaRepository<SellfoxSyncRunDO, Long> {
     fun findAllByOrderByStartedAtDesc(pageable: Pageable): List<SellfoxSyncRunDO>
     fun existsByStatus(status: String): Boolean
-    fun findByStatus(status: String): List<SellfoxSyncRunDO>
     fun findByStatusAndStartedAtBefore(status: String, startedAt: java.time.Instant): List<SellfoxSyncRunDO>
 }
 

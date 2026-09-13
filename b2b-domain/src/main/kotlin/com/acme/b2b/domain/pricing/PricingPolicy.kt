@@ -30,13 +30,13 @@ object PricingPolicy {
         quantity: Quantity = Quantity.ONE,
     ): ResolvedPrice? {
         stated(variant, tier, priceBook, quantity)?.let {
-            return ResolvedPrice(it, variant.perUnit(it), PriceSource.STATED)
+            return ResolvedPrice(it, variant.perUnit(it))
         }
         if (tier.anchor) return null
 
         val anchorPrice = stated(variant, anchor, priceBook, quantity) ?: return null
         val price = anchorPrice.lessDiscount(tier.discount)
-        return ResolvedPrice(price, variant.perUnit(price), PriceSource.DISCOUNTED)
+        return ResolvedPrice(price, variant.perUnit(price))
     }
 
     /**
@@ -80,12 +80,4 @@ object PricingPolicy {
 data class ResolvedPrice(
     val forOneSku: Money,
     val perUnit: Money,
-    val source: PriceSource,
 )
-
-enum class PriceSource {
-    /** Someone set this price for this SKU and this tier. */
-    STATED,
-    /** Nobody did, so the tier's discount came off the SKU's anchor price. */
-    DISCOUNTED,
-}

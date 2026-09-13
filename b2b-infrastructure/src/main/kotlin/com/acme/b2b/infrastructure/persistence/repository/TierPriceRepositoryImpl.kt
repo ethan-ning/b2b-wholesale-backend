@@ -16,11 +16,6 @@ class TierPriceRepositoryImpl(
     private val jpa: TierPriceJpaRepository,
 ) : TierPriceRepository {
 
-    override fun findFor(skus: Collection<SkuCode>, tierId: TierId): List<TierPrice> {
-        if (skus.isEmpty()) return emptyList()
-        return jpa.findBySkuInAndTierId(skus.map { it.value }, tierId.value).map { it.toDomain() }
-    }
-
     override fun findAllFor(skus: Collection<SkuCode>): List<TierPrice> {
         if (skus.isEmpty()) return emptyList()
         return jpa.findBySkuIn(skus.map { it.value }).map { it.toDomain() }

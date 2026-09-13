@@ -98,10 +98,14 @@ Carried over from the frontend's design work — see the portal repo's
 - **One variant axis per SPU.** `Size` for apparel, `Pack Qty` for parts. `Product`
   rejects a multi-SKU product with no axis, and rejects a SKU that does not sit beneath
   its SPU code.
-- **A tier is a standing discount, not a label.** `CustomerTier.discount` prices every
-  SKU the moment it is imported: `PricingPolicy` takes a per-SKU row where one exists and
-  otherwise the tier's rate off list. Nothing is ever "unpriced", which is why
-  `Product.isSellable` asks only for something on sale at a price above zero.
+- **One tier is the anchor; the rest discount off it.** A SKU's Default price is stated;
+  Silver and Gold take `CustomerTier.discount` off it unless that SKU has been given a
+  price of its own. `PricingPolicy` is the whole rule in one function, and returns null
+  for a SKU with no Default price rather than inventing one — so "unpriced" is a real
+  state, and `Product.isSellable` asks that every SKU on sale has a Default price.
+- **Supplier cost is not a dealer price.** `product.base_wholesale_price` is derived —
+  the cheapest Default price among the SKUs on sale — and read only by search, which
+  needs one figure per product to filter and sort on. Nothing is priced from it.
 - **MAP is stated per SKU, and prices are per SKU.** No SPU-level row to inherit from. A
   SKU's price is what one of it costs — a garment, or a whole 6-pack — so `Money` and
   `PackQuantity` together give the per-unit figure for display. A discount comes off the
@@ -161,9 +165,9 @@ Two rules the code enforces structurally rather than by review:
 - **Category delete refuses when the node has children or products**, rather than
   cascading. A cascade would unfile products invisibly from the button the admin pressed.
 - **A product cannot be shown for one of two reasons, and each says which.** Nothing on
-  sale means the supplier withdrew every SKU; no list price means a tier's rate would come
-  off nothing. Merged into one sentence, the half that did not apply sent someone looking
-  for a per-SKU price field that the discounts had removed.
+  sale means the supplier withdrew every SKU; no Default price means a SKU has no price at
+  any tier. Merged into one sentence, the half that did not apply sent someone looking for
+  a setting that did not exist.
 - **A product has two states, ACTIVE and INACTIVE, and cannot be deleted.** There is no
   draft — products arrive from the ERP already real — and no separate archived state,
   since it meant the same thing as inactive and two names for one rule invites two
@@ -192,12 +196,12 @@ would break every database that already has it.
 
 Deliberate, in rough priority order:
 
-1. **Price filtering and sorting use list price**, not the dealer's resolved price.
+1. **Price filtering and sorting use the derived reference price**, not the dealer's own.
    `ProductRepositoryImpl` resolves in memory after loading, which is correct for the
    current catalog size but does not scale. The fix is a materialised
    `(sku, tier_id, price)` view that can be joined and sorted in SQL.
 2. **The tier discount is stated twice.** The portal computes it as well, so the admin
-   grid can follow a base price as it is typed. `tierPricing.ts` keeps it to one function
+   grid can follow a Default price as it is typed. `tierPricing.ts` keeps it to one function
    and tests it against the same cases as `Money.lessDiscount`; a materialised price view
    would remove the need.
 3. **Search is `ILIKE`, not full-text.** Adequate for a few hundred products; Postgres
