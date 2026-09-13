@@ -38,5 +38,6 @@ object AdminAssembler {
         id = tier.id.value,
         name = tier.name,
         sortOrder = tier.sortOrder,
+        discountPercent = tier.discount.value,
     )
 }

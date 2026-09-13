@@ -75,5 +75,6 @@ class AccountDataConverter {
         id = TierId(checkNotNull(row.id) { "A persisted tier must have an id" }),
         name = row.name,
         sortOrder = row.sortOrder,
+        discount = DiscountPercent.of(row.discountPercent),
     )
 }

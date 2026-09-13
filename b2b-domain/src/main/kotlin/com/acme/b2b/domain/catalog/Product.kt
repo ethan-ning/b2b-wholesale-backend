@@ -63,16 +63,15 @@ class Product(
     /**
      * Whether this product could be shown to a dealer at all, whatever [visibility] says.
      *
-     * An ERP import arrives with no dealer price — Sellfox knows cost and stock, not what
-     * a dealer pays — so it is not merely hidden until someone prices it, it is unsellable:
-     * making it visible would offer it at [baseWholesalePrice], which for an import is zero.
+     * It used to mean "every SKU has a tier price". Tiers carry a standing discount now,
+     * so a price exists from the moment of import and no SKU can be unpriced — but the
+     * hazard behind that rule did not go away, it moved. A discount off nothing is still
+     * nothing, so an import that arrives without a list price would be offered free.
      *
-     * [pricedSkus] is the SKU codes carrying at least one tier price. Every SKU still on
-     * sale must be covered — a half-priced product shows some pack sizes at list price and
-     * the rest at nothing, which reads as a bug rather than as a missing price.
+     * That is the whole rule: something to sell, at a price above zero.
      */
-    fun isSellable(pricedSkus: Set<SkuCode>): Boolean =
-        onSaleVariants.isNotEmpty() && onSaleVariants.all { it.sku in pricedSkus }
+    fun isSellable(): Boolean =
+        onSaleVariants.isNotEmpty() && !baseWholesalePrice.isZero()
 
     /**
      * Returns the same product in a different visibility state. Everything else is carried

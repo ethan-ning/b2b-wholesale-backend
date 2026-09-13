@@ -127,4 +127,8 @@ class CustomerTierDO(
 
     @Column(name = "sort_order", nullable = false)
     var sortOrder: Int = 0,
+
+    /** So much off list, on everything this tier buys. */
+    @Column(name = "discount_percent", nullable = false)
+    var discountPercent: BigDecimal = BigDecimal.ZERO,
 )

@@ -51,6 +51,7 @@ class ProductAdminServiceTest {
 
     private fun product(
         visibility: ProductVisibility = ProductVisibility.HIDDEN,
+        basePrice: String = "10.00",
         variants: List<ProductVariant> = listOf(variant("PL-1-S", "S")),
         categoryIds: List<Long> = listOf(2),
         primaryCategoryId: Long? = 2,
@@ -60,7 +61,7 @@ class ProductAdminServiceTest {
         name = "Chrome Hub Cap",
         brand = null,
         description = null,
-        baseWholesalePrice = Money.of("10.00"),
+        baseWholesalePrice = Money.of(basePrice),
         locationCode = null,
         variantAxis = VariantAxis.SIZE,
         attributes = emptyMap(),
@@ -82,7 +83,7 @@ class ProductAdminServiceTest {
         products,
         tierPrices,
         categories,
-        InMemoryTierRepository(listOf(CustomerTier(gold, "Gold", 1), CustomerTier(silver, "Silver", 2))),
+        InMemoryTierRepository(),
         stock,
     )
 
@@ -90,12 +91,13 @@ class ProductAdminServiceTest {
 
     private fun command(
         visibility: String = "HIDDEN",
+        baseWholesalePrice: BigDecimal = BigDecimal("12.00"),
         categoryIds: List<Long> = listOf(2),
         primaryCategoryId: Long? = 2,
         tierPrices: List<TierPriceEntry> = emptyList(),
         variantMapPrices: Map<Long, BigDecimal?> = emptyMap(),
     ) = UpdateProductCommand(
-        baseWholesalePrice = BigDecimal("12.00"),
+        baseWholesalePrice = baseWholesalePrice,
         locationCode = "A1-1",
         visibility = visibility,
         categoryIds = categoryIds,
@@ -107,8 +109,10 @@ class ProductAdminServiceTest {
     // ─── The pricing guard, on both routes ───────────────────────────────
 
     @Test
-    fun `an unpriced product cannot be made visible from the eye button`() {
-        val products = InMemoryProductRepository(listOf(product()))
+    fun `a product with no list price cannot be made visible from the eye button`() {
+        // Nothing has to be priced per SKU any more — tiers carry a discount — but a
+        // discount off nothing is nothing, and visible this would be offered free.
+        val products = InMemoryProductRepository(listOf(product(basePrice = "0.00")))
 
         val failure = assertFailsWith<UseCaseViolation> {
             service(products).setActive(1, active = true)
@@ -119,11 +123,20 @@ class ProductAdminServiceTest {
     }
 
     @Test
-    fun `an unpriced product cannot be made visible from the edit form either`() {
+    fun `a product nobody has priced per SKU goes visible on its tier discounts alone`() {
         val products = InMemoryProductRepository(listOf(product()))
 
+        service(products).setActive(1, active = true)
+
+        assertEquals(ProductVisibility.VISIBLE, products.findById(1)!!.visibility)
+    }
+
+    @Test
+    fun `a product with no list price cannot be made visible from the edit form either`() {
+        val products = InMemoryProductRepository(listOf(product(basePrice = "0.00")))
+
         assertFailsWith<UseCaseViolation> {
-            service(products).update(1, command(visibility = "VISIBLE"))
+            service(products).update(1, command(visibility = "VISIBLE", baseWholesalePrice = BigDecimal.ZERO))
         }
     }
 
@@ -156,14 +169,16 @@ class ProductAdminServiceTest {
     }
 
     @Test
-    fun `half a price book is not enough`() {
+    fun `pricing one size and not the other is no longer a problem`() {
         val products = InMemoryProductRepository(
             listOf(product(variants = listOf(variant("PL-1-S", "S"), variant("PL-1-M", "M"))))
         )
-        // One size priced and the other at nothing reads as a bug, not a missing price.
+        // It used to block the product. The unpriced size now takes its tier's rate.
         val service = service(products, InMemoryTierPriceRepository(listOf(priced("PL-1-S"))))
 
-        assertFailsWith<UseCaseViolation> { service.setActive(1, active = true) }
+        service.setActive(1, active = true)
+
+        assertEquals(ProductVisibility.VISIBLE, products.findById(1)!!.visibility)
     }
 
     @Test
@@ -329,13 +344,51 @@ class ProductAdminServiceTest {
 
     @Test
     fun `the detail view reports whether the product could be sold`() {
-        val products = InMemoryProductRepository(listOf(product()))
-
-        assertFalse(service(products).findById(1)!!.product.sellable!!)
-        assertTrue(
-            service(products, InMemoryTierPriceRepository(listOf(priced("PL-1-S"))))
+        assertTrue(service(InMemoryProductRepository(listOf(product()))).findById(1)!!.product.sellable!!)
+        assertFalse(
+            service(InMemoryProductRepository(listOf(product(basePrice = "0.00"))))
                 .findById(1)!!.product.sellable!!
         )
+    }
+
+    /**
+     * A row for every SKU against every tier, whether or not anyone typed a price. The
+     * screen renders all of them, and building the list here keeps one place deciding
+     * what a tier pays.
+     */
+    @Test
+    fun `the price book covers every SKU and tier, saying which prices were set by hand`() {
+        val products = InMemoryProductRepository(
+            listOf(product(variants = listOf(variant("PL-1-S", "S"), variant("PL-1-M", "M"))))
+        )
+
+        val book = service(products, InMemoryTierPriceRepository(listOf(priced("PL-1-S"))))
+            .findById(1)!!.tierPrices
+
+        // Two SKUs against three tiers.
+        assertEquals(6, book.size)
+
+        val standard = book.single { it.sku == "PL-1-M" && it.tierName == "Gold" }
+        assertFalse(standard.customised)
+        // 10.00 list, 18% off.
+        assertEquals(Money.of("8.20").amount, standard.price)
+        assertEquals(Money.of("8.20").amount, standard.standardPrice)
+
+        val overridden = book.single { it.sku == "PL-1-S" && it.tierId == 1L }
+        assertTrue(overridden.customised)
+        // The override stands, and what it departed from is still reported beside it.
+        assertEquals(Money.of("8.20").amount, overridden.standardPrice)
+    }
+
+    @Test
+    fun `a tier paying list is not treated as a discount`() {
+        val products = InMemoryProductRepository(listOf(product()))
+
+        val row = service(products).findById(1)!!.tierPrices.single { it.tierName == "Default" }
+
+        assertEquals(Money.of("10.00").amount, row.price)
+        assertEquals(java.math.BigDecimal("0.00"), row.discountPercent)
+        assertFalse(row.customised)
     }
 
     @Test
@@ -352,7 +405,8 @@ class ProductAdminServiceTest {
             stock = InMemoryStockBreakdownRepository(lines),
         ).findById(1)!!
 
-        assertEquals(1, detail.tierPrices.size)
+        // One SKU against the three tiers.
+        assertEquals(3, detail.tierPrices.size)
         assertEquals(listOf("TX", "TN"), detail.stockByWarehouse.map { it.warehouseName })
         assertEquals(300, detail.stockByWarehouse.first().incoming)
     }

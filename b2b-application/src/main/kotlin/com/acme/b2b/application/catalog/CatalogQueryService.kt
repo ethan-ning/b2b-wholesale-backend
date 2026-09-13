@@ -15,6 +15,8 @@ import com.acme.b2b.types.SpuCode
 import com.acme.b2b.types.TierId
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.acme.b2b.domain.customer.CustomerTier
+import com.acme.b2b.domain.customer.CustomerTierRepository
 
 /**
  * The dealer-facing catalog use cases: search, and product detail.
@@ -29,11 +31,12 @@ class CatalogQueryService(
     private val products: ProductRepository,
     private val tierPrices: TierPriceRepository,
     private val categories: CategoryRepository,
+    private val tiers: CustomerTierRepository,
     private val dealerContext: DealerContext,
 ) {
 
     fun search(query: ProductQuery): PagedDTO<ProductDTO> {
-        val tierId = dealerContext.currentTierId()
+        val tier = currentTier()
         val criteria = ProductSearchCriteria(
             text = query.search?.takeIf { it.isNotBlank() },
             categoryId = query.categoryId,
@@ -44,7 +47,7 @@ class CatalogQueryService(
 
         val page = products.search(criteria, Page(query.page, query.size))
         val categoryNames = categoryNames()
-        val priced = page.map { product -> toDTO(product, tierId, categoryNames) }
+        val priced = page.map { product -> toDTO(product, tier, categoryNames) }
 
         return PagedDTO(
             content = priced.content,
@@ -68,20 +71,31 @@ class CatalogQueryService(
     fun findBySpuCode(spuCode: String): ProductDTO? {
         val product = products.findBySpuCode(SpuCode(spuCode)) ?: return null
         if (!product.isVisible || product.onSaleVariants.isEmpty()) return null
-        return toDTO(product, dealerContext.currentTierId(), categoryNames())
+        return toDTO(product, currentTier(), categoryNames())
     }
 
     fun categoryTree(): List<CategoryDTO> = categories.findTree().map { ProductAssembler.toDTO(it) }
 
     /**
-     * Prices every SKU of [product] for [tierId] in one repository round trip, then
+     * The dealer's own tier, with the discount that prices everything they have not been
+     * quoted for. Looked up rather than carried on the token: a tier's rate can change
+     * between a dealer signing in and asking a price.
+     */
+    private fun currentTier(): CustomerTier {
+        val tierId = dealerContext.currentTierId()
+        return tiers.findById(tierId)
+            ?: throw IllegalStateException("Dealer is on tier ${tierId.value}, which does not exist")
+    }
+
+    /**
+     * Prices every SKU of [product] for [tier] in one repository round trip, then
      * assembles. Pricing a page is one query for the whole page, not one per SKU.
      */
-    private fun toDTO(product: Product, tierId: TierId, categoryNames: Map<Long, String>): ProductDTO {
+    private fun toDTO(product: Product, tier: CustomerTier, categoryNames: Map<Long, String>): ProductDTO {
         val onSale = product.onSaleVariants
-        val priceBook = tierPrices.findFor(onSale.map { it.sku }, tierId)
+        val priceBook = tierPrices.findFor(onSale.map { it.sku }, tier.id)
         val resolved: Map<String, ResolvedPrice> = onSale.associate { variant ->
-            variant.sku.value to PricingPolicy.resolve(product, variant, tierId, priceBook)
+            variant.sku.value to PricingPolicy.resolve(product, variant, tier, priceBook)
         }
         return ProductAssembler.toDTO(product, resolved, categoryNames, variants = onSale)
     }

@@ -1,5 +1,6 @@
 package com.acme.b2b.application.admin.dto
 
+import java.math.BigDecimal
 /** Published contract for the admin portal. Matches the frontend's api/adminApi.ts. */
 
 data class AdminUserDTO(
@@ -42,6 +43,8 @@ data class CustomerTierDTO(
     val id: Long,
     val name: String,
     val sortOrder: Int,
+    /** So much off list, on everything this tier buys. */
+    val discountPercent: BigDecimal,
 )
 
 /**

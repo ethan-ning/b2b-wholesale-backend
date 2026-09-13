@@ -3,6 +3,7 @@ package com.acme.b2b.domain.customer
 import com.acme.b2b.domain.common.Page
 import com.acme.b2b.domain.common.PageOf
 import com.acme.b2b.types.Email
+import com.acme.b2b.types.DiscountPercent
 import com.acme.b2b.types.TierId
 
 interface CustomerRepository {
@@ -21,4 +22,7 @@ interface CustomerRepository {
 interface CustomerTierRepository {
     fun findById(id: TierId): CustomerTier?
     fun findAll(): List<CustomerTier>
+
+    /** Retuning what a tier pays. The only field of a tier the back office can change. */
+    fun updateDiscount(id: TierId, discount: DiscountPercent): CustomerTier
 }

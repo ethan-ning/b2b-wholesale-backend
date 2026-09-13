@@ -14,6 +14,7 @@ import com.acme.b2b.domain.customer.*
 import com.acme.b2b.domain.pricing.TierPrice
 import com.acme.b2b.domain.pricing.TierPriceRepository
 import com.acme.b2b.types.*
+import com.acme.b2b.types.DiscountPercent
 
 /**
  * In-memory stand-ins for the ports. Hand-written rather than mocked: they behave like
@@ -64,13 +65,25 @@ class InMemoryCustomerRepository(seed: List<Customer> = emptyList()) : CustomerR
 }
 
 class InMemoryTierRepository(
-    private val tiers: List<CustomerTier> = listOf(
-        CustomerTier(TierId(1), "Gold", 1),
-        CustomerTier(TierId(2), "Silver", 2),
+    seed: List<CustomerTier> = listOf(
+        // The three the portal ships with: one paying list, two with a standing discount.
+        CustomerTier(TierId(3), "Default", 1, DiscountPercent.NONE),
+        CustomerTier(TierId(2), "Silver", 2, DiscountPercent.of(7)),
+        CustomerTier(TierId(1), "Gold", 3, DiscountPercent.of(18)),
     ),
 ) : CustomerTierRepository {
+    private val tiers = seed.toMutableList()
+
     override fun findById(id: TierId) = tiers.firstOrNull { it.id == id }
-    override fun findAll() = tiers
+    override fun findAll() = tiers.sortedBy { it.sortOrder }
+
+    override fun updateDiscount(id: TierId, discount: DiscountPercent): CustomerTier {
+        val index = tiers.indexOfFirst { it.id == id }
+        require(index >= 0) { "No such tier" }
+        val updated = tiers[index].copy(discount = discount)
+        tiers[index] = updated
+        return updated
+    }
 }
 
 class InMemoryAdminRepository(seed: List<AdminUser> = emptyList()) : AdminUserRepository {

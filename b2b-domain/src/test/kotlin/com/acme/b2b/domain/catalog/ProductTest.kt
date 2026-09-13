@@ -100,18 +100,24 @@ class ProductTest {
         assertFalse(gloves.variants.last().stock.isOutOfStock)
     }
 
+    /**
+     * No longer "every SKU has a tier price" — tiers carry a standing discount, so a
+     * price exists from import. What is left is the hazard that rule was really guarding.
+     */
     @Test
-    fun `a product is sellable only when every SKU is priced`() {
+    fun `a product with SKUs and a list price is sellable, without anyone pricing a SKU`() {
         val gloves = product(
             variants = listOf(variant("GL100-BLK-S", "S"), variant("GL100-BLK-M", "M")),
             axis = VariantAxis.SIZE,
         )
 
-        assertTrue(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"), SkuCode("GL100-BLK-M"))))
-        // Half-priced shows one size at list price and the other at nothing, which reads
-        // to the dealer as a broken page rather than as a missing price.
-        assertFalse(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"))))
-        assertFalse(gloves.isSellable(emptySet()))
+        assertTrue(gloves.isSellable())
+    }
+
+    @Test
+    fun `a product with no list price is not sellable at any discount`() {
+        // A discount off nothing is nothing. Visible, this would be offered free.
+        assertFalse(product(basePrice = "0.00").isSellable())
     }
 
     /** The same SKU as the supplier would leave it after withdrawing it. */
@@ -137,9 +143,7 @@ class ProductTest {
     }
 
     @Test
-    fun `a discontinued SKU does not have to be priced`() {
-        // The supplier stopped selling it, so it is not something to offer — and it must
-        // not hold the rest of the product back from going on sale.
+    fun `a withdrawn SKU does not hold the rest of the product back`() {
         val gloves = product(
             variants = listOf(
                 variant("GL100-BLK-S", "S"),
@@ -148,7 +152,7 @@ class ProductTest {
             axis = VariantAxis.SIZE,
         )
 
-        assertTrue(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"))))
+        assertTrue(gloves.isSellable())
     }
 
     @Test
@@ -159,13 +163,13 @@ class ProductTest {
             ),
         )
 
-        assertFalse(gone.isSellable(setOf(SkuCode("GL100-BLK-S"))))
+        assertFalse(gone.isSellable())
     }
 
     @Test
-    fun `a freshly imported product is not sellable`() {
-        // What an ERP import looks like: real SKUs, no tier prices anywhere.
-        assertFalse(product().isSellable(emptySet()))
+    fun `a freshly imported product is sellable as soon as it has a list price`() {
+        // An import arrives with no tier prices at all. Its tier's discount is enough.
+        assertTrue(product().isSellable())
     }
 
     @Test

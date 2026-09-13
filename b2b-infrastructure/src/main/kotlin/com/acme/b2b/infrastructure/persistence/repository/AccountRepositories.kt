@@ -13,9 +13,11 @@ import com.acme.b2b.infrastructure.persistence.jpa.AdminUserJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.CustomerJpaRepository
 import com.acme.b2b.infrastructure.persistence.jpa.CustomerTierJpaRepository
 import com.acme.b2b.types.Email
+import com.acme.b2b.types.DiscountPercent
 import com.acme.b2b.types.TierId
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 
 @Repository
 class AdminUserRepositoryImpl(
@@ -90,4 +92,11 @@ class CustomerTierRepositoryImpl(
 
     override fun findAll(): List<CustomerTier> =
         jpa.findAll().sortedBy { it.sortOrder }.map { converter.toDomain(it) }
+
+    @Transactional
+    override fun updateDiscount(id: TierId, discount: DiscountPercent): CustomerTier {
+        val row = jpa.findById(id.value).orElseThrow { NoSuchElementException("No such tier") }
+        row.discountPercent = discount.value
+        return converter.toDomain(jpa.save(row))
+    }
 }

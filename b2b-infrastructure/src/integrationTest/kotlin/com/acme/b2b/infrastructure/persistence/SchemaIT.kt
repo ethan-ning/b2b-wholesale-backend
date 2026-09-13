@@ -82,12 +82,46 @@ class SchemaIT : PostgresTest() {
     }
 
     @Test
-    fun `the two pricing tiers are seeded with fixed ids`() {
+    fun `the pricing tiers are seeded with fixed ids and their standing discounts`() {
         // tier_price rows reference these, so insertion order must not decide them.
-        val tiers = em.createNativeQuery("SELECT id, name FROM customer_tier ORDER BY id").resultList
-            .map { (it as Array<*>).let { row -> "${row[0]}:${row[1]}" } }
+        val tiers = em.createNativeQuery(
+            "SELECT id, name, discount_percent FROM customer_tier ORDER BY sort_order"
+        ).resultList.map { (it as Array<*>).let { row -> "${row[0]}:${row[1]}:${row[2]}" } }
 
-        assertEquals(listOf("1:Gold", "2:Silver"), tiers)
+        // Default pays list; the other two carry the rates the catalogue was already using.
+        assertEquals(listOf("3:Default:0.00", "2:Silver:7.00", "1:Gold:18.00"), tiers)
+    }
+
+    /**
+     * Requirement, not a happy accident of the schema: a product going away takes its
+     * variants and their prices with it, or the price book fills with rows keyed to SKUs
+     * that no longer exist.
+     */
+    @Test
+    fun `removing a product clears the tier prices hanging off its SKUs`() {
+        em.createNativeQuery(
+            "INSERT INTO product (spu_code, name, base_wholesale_price) VALUES ('CASCADE-1', 'Probe', 10.00)"
+        ).executeUpdate()
+        val productId = em.createNativeQuery("SELECT id FROM product WHERE spu_code = 'CASCADE-1'")
+            .singleResult as Number
+        em.createNativeQuery(
+            "INSERT INTO product_variant (product_id, sku, pack_quantity, status) " +
+                "VALUES (${productId.toLong()}, 'CASCADE-1-A', 1, 'ACTIVE')"
+        ).executeUpdate()
+        em.createNativeQuery(
+            "INSERT INTO tier_price (sku, tier_id, price) VALUES ('CASCADE-1-A', 1, 9.00)"
+        ).executeUpdate()
+        em.flush()
+
+        fun priceRows() = (em.createNativeQuery(
+            "SELECT count(*) FROM tier_price WHERE sku = 'CASCADE-1-A'"
+        ).singleResult as Number).toInt()
+        assertEquals(1, priceRows())
+
+        em.createNativeQuery("DELETE FROM product WHERE id = ${productId.toLong()}").executeUpdate()
+        em.flush()
+
+        assertEquals(0, priceRows())
     }
 
     @Test

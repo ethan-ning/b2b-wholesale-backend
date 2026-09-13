@@ -46,4 +46,13 @@ class AdminCustomerController(
 
     @GetMapping("/tiers")
     fun tiers(): List<CustomerTierDTO> = customers.tiers()
+
+    /** Retunes a tier. Every SKU nobody has quoted separately moves with it. */
+    @PutMapping("/tiers/{id}/discount")
+    fun setTierDiscount(
+        @PathVariable id: Long,
+        @RequestBody body: TierDiscountRequest,
+    ): CustomerTierDTO = customers.setTierDiscount(id, body.discountPercent)
 }
+
+data class TierDiscountRequest(val discountPercent: java.math.BigDecimal)

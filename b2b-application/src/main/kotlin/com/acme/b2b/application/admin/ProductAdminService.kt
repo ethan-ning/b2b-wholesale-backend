@@ -10,7 +10,9 @@ import com.acme.b2b.application.catalog.dto.ProductDTO
 import com.acme.b2b.application.support.UseCaseViolation
 import com.acme.b2b.domain.catalog.*
 import com.acme.b2b.domain.common.Page
+import com.acme.b2b.domain.customer.CustomerTier
 import com.acme.b2b.domain.customer.CustomerTierRepository
+import com.acme.b2b.types.DiscountPercent
 import com.acme.b2b.domain.pricing.PricingPolicy
 import com.acme.b2b.domain.pricing.TierPrice
 import com.acme.b2b.domain.pricing.TierPriceRepository
@@ -47,14 +49,8 @@ class ProductAdminService(
         )
         val page = products.search(criteria, Page(query.page, query.size))
         val names = categoryNames()
-        // One query for the whole page, not one per product.
-        val priced = tierPrices
-            .findAllFor(page.content.flatMap { product -> product.variants.map { it.sku } })
-            .map { it.sku }
-            .toSet()
-
         return PagedDTO(
-            content = page.content.map { toDto(it, names, sellable = it.isSellable(priced)) },
+            content = page.content.map { toDto(it, names, sellable = it.isSellable()) },
             totalElements = page.totalElements,
             totalPages = page.totalPages,
             page = page.page.number,
@@ -75,7 +71,7 @@ class ProductAdminService(
      * from a priced one.
      */
     private fun detailOf(product: Product) = AdminProductDTO(
-        product = toDto(product, categoryNames(), sellable = product.isSellable(pricedSkusOf(product))),
+        product = toDto(product, categoryNames(), sellable = product.isSellable()),
         tierPrices = priceBookOf(product),
         stockByWarehouse = stockOf(product),
     )
@@ -211,37 +207,52 @@ class ProductAdminService(
      */
     private fun requireSellableIfVisible(product: Product) {
         if (!product.isVisible) return
-        if (product.isSellable(pricedSkusOf(product))) return
+        if (product.isSellable()) return
         throw UseCaseViolation(
-            "Set tier pricing for every SKU of ${product.spuCode} before showing it to dealers"
+            "${product.spuCode} has no SKU on sale with a list price, so no dealer could buy it"
         )
     }
 
-    /** SKUs of this product that carry at least one tier price. */
-    private fun pricedSkusOf(product: Product): Set<SkuCode> =
-        tierPrices.findAllFor(product.variants.map { it.sku }).map { it.sku }.toSet()
-
+    /**
+     * Every SKU of this product against every tier — the complete picture, not just the
+     * rows someone typed.
+     *
+     * The screen has to render a price for each pairing either way, and building it here
+     * means one place decides what a tier pays. Left to the client, the discount
+     * arithmetic would be stated twice and would eventually disagree with the dealer's.
+     */
     private fun priceBookOf(product: Product): List<TierPriceDTO> {
-        val names = tiers.findAll().associate { it.id.value to it.name }
-        val order = product.variants.map { it.sku }.withIndex().associate { (i, sku) -> sku to i }
+        val allTiers = tiers.findAll()
+        val overrides = tierPrices.findAllFor(product.variants.map { it.sku })
+            .associateBy { it.sku to it.tierId }
 
-        return tierPrices.findAllFor(product.variants.map { it.sku })
-            .map { row ->
+        return product.variants.flatMap { variant ->
+            allTiers.map { tier ->
+                val override = overrides[variant.sku to tier.id]
+                val standard = PricingPolicy.standardPrice(product, variant, tier)
+                val price = override?.price ?: standard
                 TierPriceDTO(
-                    sku = row.sku.value,
-                    tierId = row.tierId.value,
-                    tierName = names[row.tierId.value] ?: "",
-                    price = row.price.amount,
-                    minQty = row.minQty.value,
+                    sku = variant.sku.value,
+                    tierId = tier.id.value,
+                    tierName = tier.name,
+                    price = price.amount,
+                    standardPrice = standard.amount,
+                    discountPercent = tier.discount.value,
+                    customised = override != null,
+                    breachesMap = PricingPolicy.breachesMap(variant, price),
+                    minQty = override?.minQty?.value ?: 1,
                 )
             }
-            // Variant order, not SKU string: sizes are not lexical (S < M < L < XL).
-            .sortedWith(compareBy({ order[SkuCode(it.sku)] ?: Int.MAX_VALUE }, { it.tierId }, { it.minQty }))
+        }
+        // Variant order then tier order, taken from the iteration rather than a sort:
+        // sizes are not lexical (S < M < L < XL), so sorting on the SKU string would
+        // scramble them.
     }
 
     /**
      * The admin view shows list price rather than a tier price: there is no dealer in
-     * this request to resolve one for.
+     * this request to resolve one for. The price book each tier would pay is carried
+     * separately, on AdminProductDTO.tierPrices.
      */
     private fun toDto(
         product: Product,
@@ -249,9 +260,7 @@ class ProductAdminService(
         sellable: Boolean? = null,
     ): ProductDTO {
         val listPrices = product.variants.associate { variant ->
-            variant.sku.value to PricingPolicy.resolve(
-                product, variant, LIST_PRICE_TIER, priceBook = emptyList(),
-            )
+            variant.sku.value to PricingPolicy.listPrice(product, variant)
         }
         return ProductAssembler.toDTO(product, listPrices, categoryNames, sellable)
     }
@@ -272,8 +281,4 @@ class ProductAdminService(
         runCatching { ProductVisibility.valueOf(raw.uppercase()) }
             .getOrElse { throw UseCaseViolation("Unknown product visibility: $raw") }
 
-    private companion object {
-        /** Any tier; with an empty price book the policy falls through to list price. */
-        val LIST_PRICE_TIER = TierId(1)
-    }
 }

@@ -13,6 +13,8 @@ import com.acme.b2b.types.Email
 import com.acme.b2b.types.TierId
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.acme.b2b.types.DiscountPercent
+import java.math.BigDecimal
 
 /**
  * Dealer account management. Orchestration only: Customer owns its own lifecycle rules
@@ -49,6 +51,22 @@ class CustomerAdminService(
         customers.findById(id)?.let { AdminAssembler.toDTO(it, tierNames()) }
 
     fun tiers(): List<CustomerTierDTO> = tiers.findAll().map { AdminAssembler.toDTO(it) }
+
+    /**
+     * Retunes what a tier pays.
+     *
+     * Takes effect on every SKU nobody has quoted separately, which is most of the
+     * catalogue — so it is the one field here that changes prices in bulk, and the
+     * refusal below is deliberately about the number rather than about permission.
+     */
+    @Transactional
+    fun setTierDiscount(tierId: Long, percent: BigDecimal): CustomerTierDTO {
+        val discount = runCatching { DiscountPercent.of(percent) }
+            .getOrElse { throw UseCaseViolation(it.message ?: "That is not a usable discount") }
+        val tier = tiers.findById(TierId(tierId))
+            ?: throw NoSuchElementException("No such tier")
+        return AdminAssembler.toDTO(tiers.updateDiscount(tier.id, discount))
+    }
 
     /**
      * Creates the dealer with a generated temporary password, returned once in the

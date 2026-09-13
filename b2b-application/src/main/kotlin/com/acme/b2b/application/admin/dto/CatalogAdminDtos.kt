@@ -31,11 +31,30 @@ data class WarehouseStockDTO(
  * One tier_price row. minQty is always 1 in the MVP — quantity-based pricing is
  * deferred — but the field is carried so enabling it stays additive.
  */
+/**
+ * What one tier pays for one SKU, and where that figure came from.
+ *
+ * A row exists for every SKU against every tier, whether or not anyone has set a price —
+ * because since tiers carry a discount, every combination has an answer. The admin screen
+ * needs that answer to show it, and needs [customised] to say whether it is the tier's
+ * standing rate or a departure from it.
+ */
 data class TierPriceDTO(
     val sku: String,
     val tierId: Long,
     val tierName: String,
+    /** What this tier actually pays. */
     val price: BigDecimal,
+    /** The tier's discount applied to list — what an override is departing from. */
+    val standardPrice: BigDecimal,
+    val discountPercent: BigDecimal,
+    /** True when someone set this price for this SKU, rather than taking the tier's rate. */
+    val customised: Boolean,
+    /**
+     * True when this price is at or above the SKU's advertised floor, which leaves the
+     * dealer no margin. A data-entry error rather than a rule the portal enforces.
+     */
+    val breachesMap: Boolean,
     val minQty: Int,
 )
 

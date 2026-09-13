@@ -21,6 +21,16 @@ class Money private constructor(val amount: BigDecimal) : Comparable<Money> {
 
     fun isZero() = amount.compareTo(BigDecimal.ZERO) == 0
 
+    /**
+     * This price with [discount] taken off, rounded to the cent.
+     *
+     * Rounded once, here, rather than by each caller: two places rounding the same
+     * calculation their own way is how a listing and its basket come to disagree by a
+     * penny.
+     */
+    fun lessDiscount(discount: DiscountPercent): Money =
+        if (discount.isNone) this else of(amount * discount.multiplier)
+
     override fun compareTo(other: Money) = amount.compareTo(other.amount)
     override fun equals(other: Any?) = other is Money && amount.compareTo(other.amount) == 0
     override fun hashCode() = amount.stripTrailingZeros().hashCode()
