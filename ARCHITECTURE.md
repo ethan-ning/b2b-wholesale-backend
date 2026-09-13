@@ -57,13 +57,16 @@ The repository port deals in aggregates, never rows: `ProductDO` is not visible 
 
 Anything outside the process is a port the domain declares and infrastructure adapts:
 
-- `ProductRepository`, `TierPriceRepository`, `CategoryRepository`, `CustomerRepository`
-- `StockSyncPort` — the anti-corruption layer for the ERP that owns stock. The domain
-  states what it needs (levels per SKU); the adapter translates the vendor's payload, so
-  a change to their API stops at the adapter.
+- `ProductRepository`, `TierPriceRepository`, `CategoryRepository`, `CustomerRepository`,
+  `CustomerTierRepository`, `ImageRepository`, `ProductImageRepository`
+- `SellfoxCatalogPort` and `SellfoxInventoryPort` — the anti-corruption layer for the ERP
+  that owns what a product is and how many there are. The domain states what it needs; the
+  adapter translates the vendor's payload, so a change to their API stops at the adapter.
+- `ImageStore` — the bucket. Cloud Storage when `app.images.bucket` is set, a directory on
+  disk when not, chosen in one `@Bean` method so neither depends on a scan-time condition.
 - `DealerContext` — who is asking. Declared in the application layer because pricing a
   lookup needs the dealer's tier, but the use case must not know how identity was
-  established. The current adapter reads a header; a JWT adapter replaces that one class.
+  established. `JwtDealerContext` in `b2b-web` is the adapter.
 
 ## Where authentication lives
 
@@ -95,9 +98,14 @@ Carried over from the frontend's design work — see the portal repo's
 - **One variant axis per SPU.** `Size` for apparel, `Pack Qty` for parts. `Product`
   rejects a multi-SKU product with no axis, and rejects a SKU that does not sit beneath
   its SPU code.
-- **Price and MAP are stated per SKU.** No SPU-level row to inherit from. A SKU's price
-  is what one of it costs — a garment, or a whole 6-pack — so `Money` and `PackQuantity`
-  together give the per-unit figure for display.
+- **A tier is a standing discount, not a label.** `CustomerTier.discount` prices every
+  SKU the moment it is imported: `PricingPolicy` takes a per-SKU row where one exists and
+  otherwise the tier's rate off list. Nothing is ever "unpriced", which is why
+  `Product.isSellable` asks only for something on sale at a price above zero.
+- **MAP is stated per SKU, and prices are per SKU.** No SPU-level row to inherit from. A
+  SKU's price is what one of it costs — a garment, or a whole 6-pack — so `Money` and
+  `PackQuantity` together give the per-unit figure for display. A discount comes off the
+  whole SKU, never the unit price multiplied back, which would round once per unit.
 - **Quantity-based pricing is deferred but not designed out.** `TierPrice.minQty` exists
   and is pinned to 1; `PricingPolicy` already selects the highest applicable break, and
   a test proves inserting a break row changes the result with no code change.
@@ -138,7 +146,12 @@ who has been suspended.
 | `POST /api/admin/products/{id}/deactivate` `.../activate` | hides a product from dealers, reversibly |
 | `GET/POST/PUT/DELETE /api/admin/categories` | our taxonomy; delete refuses rather than cascades |
 | `GET /api/admin/inventory` | read-only; the ERP owns stock |
-| `GET/POST/PUT /api/admin/customers`, `POST .../reset-password`, `GET /api/admin/tiers` | dealer accounts |
+| `GET/POST/PUT /api/admin/customers`, `POST .../reset-password` | dealer accounts |
+| `GET /api/admin/tiers`, `PUT .../tiers/{id}/discount` | a tier's standing rate; changing one reprices every SKU nobody has quoted separately |
+| `GET/POST/DELETE /api/admin/images` | the shared image library; a delete is refused while any product shows the image |
+| `POST/DELETE /api/admin/products/{id}/images/{imageId}`, `PUT .../images/order`, `PUT .../variants/{id}/main-image` | a product's gallery, capped at nine, and which image stands for each SKU |
+| `GET/PUT /api/admin/sellfox/scope`, `POST .../sync` | what is imported, and running an import |
+| `GET/POST /api/admin/admins`, `POST .../reset-password` | the back-office roster; only a super admin may write |
 
 Two rules the code enforces structurally rather than by review:
 
@@ -147,6 +160,10 @@ Two rules the code enforces structurally rather than by review:
   because a check rejects them.
 - **Category delete refuses when the node has children or products**, rather than
   cascading. A cascade would unfile products invisibly from the button the admin pressed.
+- **A product cannot be shown for one of two reasons, and each says which.** Nothing on
+  sale means the supplier withdrew every SKU; no list price means a tier's rate would come
+  off nothing. Merged into one sentence, the half that did not apply sent someone looking
+  for a per-SKU price field that the discounts had removed.
 - **A product has two states, ACTIVE and INACTIVE, and cannot be deleted.** There is no
   draft — products arrive from the ERP already real — and no separate archived state,
   since it meant the same thing as inactive and two names for one rule invites two
@@ -164,7 +181,7 @@ never lists that location, so the seed cannot reach it.
 24 products / 55 SKUs / 100 tier-price rows, chosen to exercise the cases a handful of
 rows would not: both variant axes and two single-SKU products with no axis at all; all
 three statuses, so the admin filters have something to find; every stock state; a product
-with no tier prices, which must fall through to list price; one with no image; one filed
+with no tier prices, which must take its tier's rate; one with no image; one filed
 under two categories; and enough rows to page past the default of 10.
 
 Seeds accumulate as new versioned files rather than edits to existing ones — an applied
@@ -179,12 +196,16 @@ Deliberate, in rough priority order:
    `ProductRepositoryImpl` resolves in memory after loading, which is correct for the
    current catalog size but does not scale. The fix is a materialised
    `(sku, tier_id, price)` view that can be joined and sorted in SQL.
-3. **Admin write use cases are not built** — only the dealer read slice is. The ports
-   (`save`, `replaceFor`, `deleteById`) exist and are implemented.
-4. **`StockSyncPort` has no adapter yet.** The scheduled sync job is the next vertical
-   slice.
-5. **`AttributeCodec` is a placeholder** for the display-attribute bag. Fine for flat
+2. **The tier discount is stated twice.** The portal computes it as well, so the admin
+   grid can follow a base price as it is typed. `tierPricing.ts` keeps it to one function
+   and tests it against the same cases as `Money.lessDiscount`; a materialised price view
+   would remove the need.
+3. **Search is `ILIKE`, not full-text.** Adequate for a few hundred products; Postgres
+   FTS would also give relevance ordering.
+4. **`AttributeCodec` is a placeholder** for the display-attribute bag. Fine for flat
    string values; replace when the column becomes JSONB.
+5. **Product images have no ordering beyond position**, and no alt-text editing. The
+   library is shared, capped at nine per SPU, and each SKU may point at one of them.
 
 ## Running it
 

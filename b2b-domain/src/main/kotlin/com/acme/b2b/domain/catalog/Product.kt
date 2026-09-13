@@ -63,12 +63,9 @@ class Product(
     /**
      * Whether this product could be shown to a dealer at all, whatever [visibility] says.
      *
-     * It used to mean "every SKU has a tier price". Tiers carry a standing discount now,
-     * so a price exists from the moment of import and no SKU can be unpriced — but the
-     * hazard behind that rule did not go away, it moved. A discount off nothing is still
-     * nothing, so an import that arrives without a list price would be offered free.
-     *
-     * That is the whole rule: something to sell, at a price above zero.
+     * Something to sell, at a price above zero. Tiers carry a discount, so no SKU can be
+     * unpriced — but a discount off nothing is nothing, and an import arriving without a
+     * list price would be offered free.
      */
     fun isSellable(): Boolean = unsellableReason() == null
 

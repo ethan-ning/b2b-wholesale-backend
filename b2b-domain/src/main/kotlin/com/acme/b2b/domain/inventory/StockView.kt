@@ -32,13 +32,3 @@ data class StockSearchCriteria(
      */
     val lowStockOnly: Boolean = false,
 )
-
-/**
- * Port for the stock read side. Separate from ProductRepository because it answers
- * questions about SKUs across the whole catalog, not about one aggregate.
- */
-interface StockQueryPort {
-    fun search(criteria: StockSearchCriteria, page: Page): PageOf<SkuStock>
-    fun countLowStock(): Long
-    fun countOutOfStock(): Long
-}

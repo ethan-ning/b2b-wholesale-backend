@@ -64,11 +64,8 @@ class ProductAdminService(
     }
 
     /**
-     * The detail response, including whether the product could be sold at all.
-     *
-     * The list computed that and this did not, so the edit form — the one screen that can
-     * do something about it — was the only place that could not tell an unpriced product
-     * from a priced one.
+     * The detail response, including whether the product could be sold at all and why
+     * not — the edit form is the one screen that can do something about it.
      */
     private fun detailOf(product: Product) = AdminProductDTO(
         product = toDto(product, categoryNames(), sellable = product.isSellable()),

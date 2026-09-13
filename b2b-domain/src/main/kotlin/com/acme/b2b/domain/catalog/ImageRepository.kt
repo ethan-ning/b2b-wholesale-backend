@@ -20,9 +20,8 @@ interface ImageRepository {
     /**
      * One screenful of the library, with what is keeping each image alive.
      *
-     * Paged in the query rather than in memory. A catalogue's worth of pictures is a few
-     * hundred kilobytes of JSON and every row carries its usage, so fetching the lot to
-     * show twenty of them makes the first paint wait on all of it.
+     * Paged in the query rather than in memory: every row carries its usage, so a
+     * catalogue's worth is a few hundred kilobytes to show twenty of them.
      */
     fun findPageWithUsage(search: ImageSearch, page: Page): PageOf<ImageUsage>
 

@@ -10,13 +10,9 @@ import com.acme.b2b.domain.customer.CustomerTier
  * Resolves what a dealer pays for one SKU. A domain service: pure business rule with
  * no I/O, so it is unit-testable with no container and callers supply the rows.
  *
- *   1. the SKU's tier row with the highest minQty <= quantity — a price someone set
- *      deliberately for this SKU and this tier
- *   2. failing that, list price x pack quantity, less the tier's standing discount
- *
- * There is no third step. Every tier carries a discount, even if it is nothing, so
- * every SKU has a price the moment it is imported — which is why nothing here has to
- * treat "unpriced" as a state.
+ * A per-SKU row wins; failing that the tier's standing discount comes off list. There is
+ * no third case — every tier carries a discount, even if it is nothing, so no SKU can be
+ * unpriced and nothing here has to treat that as a state.
  */
 object PricingPolicy {
 
