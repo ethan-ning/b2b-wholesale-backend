@@ -38,12 +38,12 @@ object PricingPolicy {
      * What the tier pays without anyone having said otherwise. Separate because the admin
      * screens show it alongside an override, to say what the override is departing from.
      *
-     * The discount comes off the price of the whole SKU, so a pack is discounted as a
-     * pack — taking it off the unit price first and multiplying back would round once per
-     * unit and drift.
+     * Pack quantity does not come into it. The base price is what a SKU lists at, whatever
+     * is in the box; a pack that genuinely costs more than a single is said so with a
+     * per-SKU price, not worked out by multiplying.
      */
     fun standardPrice(product: Product, variant: ProductVariant, tier: CustomerTier): Money =
-        (product.baseWholesalePrice * variant.packQuantity.value).lessDiscount(tier.discount)
+        product.baseWholesalePrice.lessDiscount(tier.discount)
 
     /**
      * List price, for a screen with no dealer in it.
@@ -54,7 +54,7 @@ object PricingPolicy {
      * and would quietly become their price if the resolution ever changed.
      */
     fun listPrice(product: Product, variant: ProductVariant): ResolvedPrice {
-        val price = product.baseWholesalePrice * variant.packQuantity.value
+        val price = product.baseWholesalePrice
         return ResolvedPrice(price, variant.perUnit(price), PriceSource.LIST)
     }
 

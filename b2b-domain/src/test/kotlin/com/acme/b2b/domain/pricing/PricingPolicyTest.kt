@@ -39,6 +39,7 @@ class PricingPolicyTest {
             variants = listOf(variant("PL001-BLK-06", "6", packQuantity = 6)),
         )
         val sku = muffler.variants.single()
+        // A pack that really costs more than a single is said so with a price of its own.
         val book = listOf(TierPrice(sku.sku, gold, Money.of("93.60")))
 
         val resolved = PricingPolicy.resolve(muffler, sku, goldTier, book)
@@ -56,11 +57,38 @@ class PricingPolicyTest {
         )
         val sku = muffler.variants.single()
 
-        // A six-pack at 19.00 a unit is 114.00 at list; Gold takes 18% off the pack.
+        // The base price is what the SKU lists at; Gold takes 18% off that.
         val resolved = PricingPolicy.resolve(muffler, sku, goldTier, priceBook = emptyList())
-        assertEquals(Money.of("93.48"), resolved.forOneSku)
-        assertEquals(Money.of("15.58"), resolved.perUnit)
+        assertEquals(Money.of("15.58"), resolved.forOneSku)
         assertEquals(PriceSource.TIER_DISCOUNT, resolved.source)
+    }
+
+    /**
+     * What is in the box does not set the price. A pack that really costs more than a
+     * single says so with a price of its own, rather than being worked out by multiplying
+     * — which priced a six-pack at six times a single and nobody meant that.
+     */
+    @Test
+    fun `pack quantity does not multiply the price`() {
+        val muffler = product(
+            spuCode = "PL001-BLK",
+            basePrice = "19.00",
+            axis = VariantAxis.PACK_QUANTITY,
+            variants = listOf(
+                variant("PL001-BLK-01", "1", packQuantity = 1),
+                variant("PL001-BLK-06", "6", packQuantity = 6, sortOrder = 1),
+            ),
+        )
+        val single = muffler.variants.first { it.packQuantity.value == 1 }
+        val sixPack = muffler.variants.first { it.packQuantity.value == 6 }
+
+        assertEquals(
+            PricingPolicy.resolve(muffler, single, goldTier, emptyList()).forOneSku,
+            PricingPolicy.resolve(muffler, sixPack, goldTier, emptyList()).forOneSku,
+        )
+        // Per unit still divides by what is in the box, which is the comparison a dealer makes.
+        assertEquals(Money.of("15.58"), PricingPolicy.resolve(muffler, single, goldTier, emptyList()).perUnit)
+        assertEquals(Money.of("2.60"), PricingPolicy.resolve(muffler, sixPack, goldTier, emptyList()).perUnit)
     }
 
     @Test
@@ -71,24 +99,6 @@ class PricingPolicyTest {
         val resolved = PricingPolicy.resolve(muffler, sku, standard, priceBook = emptyList())
         assertEquals(Money.of("19.00"), resolved.forOneSku)
         assertEquals(PriceSource.TIER_DISCOUNT, resolved.source)
-    }
-
-    /**
-     * The discount comes off the price of the whole SKU. Discounting the unit and
-     * multiplying back rounds once per unit, and a twelve-pack drifts by cents.
-     */
-    @Test
-    fun `a pack is discounted as a pack, not a unit at a time`() {
-        val muffler = product(
-            basePrice = "9.99",
-            axis = VariantAxis.PACK_QUANTITY,
-            variants = listOf(variant("PL001-BLK-12", "12", packQuantity = 12)),
-        )
-        val sku = muffler.variants.single()
-
-        // 119.88 less 7% is 111.4884 -> 111.49. Per unit first would give 9.29 x 12 = 111.48.
-        assertEquals(Money.of("111.49"),
-            PricingPolicy.resolve(muffler, sku, silverTier, emptyList()).forOneSku)
     }
 
     @Test
