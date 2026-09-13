@@ -122,6 +122,38 @@ class ProductAdminServiceTest {
         assertEquals(ProductVisibility.HIDDEN, products.findById(1)!!.visibility)
     }
 
+    /**
+     * The two ways a product can be unshowable are unrelated, and saying so in one
+     * sentence sent someone hunting for a per-SKU price field that does not exist. Each
+     * refusal now names its own cause.
+     */
+    @Test
+    fun `a product whose SKUs are all discontinued says so, and does not mention pricing`() {
+        val products = InMemoryProductRepository(
+            listOf(product(variants = listOf(variant("PL-1-S", "S", active = false))))
+        )
+
+        val failure = assertFailsWith<UseCaseViolation> {
+            service(products).setActive(1, active = true)
+        }
+
+        assertTrue(failure.message!!.contains("discontinued"), failure.message)
+        // The base price is fine, so nothing should point at prices.
+        assertFalse(failure.message!!.contains("price"), failure.message)
+    }
+
+    @Test
+    fun `a product with no base price says that, and does not mention SKUs being on sale`() {
+        val products = InMemoryProductRepository(listOf(product(basePrice = "0.00")))
+
+        val failure = assertFailsWith<UseCaseViolation> {
+            service(products).setActive(1, active = true)
+        }
+
+        assertTrue(failure.message!!.contains("base wholesale price"), failure.message)
+        assertFalse(failure.message!!.contains("discontinued"), failure.message)
+    }
+
     @Test
     fun `a product nobody has priced per SKU goes visible on its tier discounts alone`() {
         val products = InMemoryProductRepository(listOf(product()))

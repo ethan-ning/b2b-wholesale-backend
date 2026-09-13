@@ -26,6 +26,12 @@ data class ProductDTO(
      * Null on the dealer-facing responses, where an unsellable product is not returned.
      */
     val sellable: Boolean? = null,
+    /**
+     * Why not, when [sellable] is false — NOTHING_ON_SALE or NO_LIST_PRICE. Carried so the
+     * back office can say which it is before somebody tries and is refused; the two have
+     * nothing to do with each other and different things to do about them.
+     */
+    val unsellableReason: String? = null,
     val categories: List<ProductCategoryDTO>,
     val images: List<ProductImageDTO>,
     val variants: List<VariantDTO>,

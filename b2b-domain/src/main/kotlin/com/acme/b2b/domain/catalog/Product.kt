@@ -70,8 +70,20 @@ class Product(
      *
      * That is the whole rule: something to sell, at a price above zero.
      */
-    fun isSellable(): Boolean =
-        onSaleVariants.isNotEmpty() && !baseWholesalePrice.isZero()
+    fun isSellable(): Boolean = unsellableReason() == null
+
+    /**
+     * Why this product could not be shown, or null if it could.
+     *
+     * Two separate conditions, reported separately. Said in one sentence — "no SKU on
+     * sale with a list price" — a reader cannot tell which of them failed, and the half
+     * that did not sends them looking for a setting that does not exist.
+     */
+    fun unsellableReason(): UnsellableReason? = when {
+        onSaleVariants.isEmpty() -> UnsellableReason.NOTHING_ON_SALE
+        baseWholesalePrice.isZero() -> UnsellableReason.NO_LIST_PRICE
+        else -> null
+    }
 
     /**
      * Returns the same product in a different visibility state. Everything else is carried
@@ -106,4 +118,13 @@ class Product(
     val hasStock: Boolean get() = totalAvailableStock > 0
 
     override fun toString() = "Product($spuCode)"
+}
+
+/** Why a product cannot be shown to dealers. Each says what to do about it. */
+enum class UnsellableReason {
+    /** Every SKU is discontinued, so there is nothing to sell — not a pricing problem. */
+    NOTHING_ON_SALE,
+
+    /** No list price, and a tier discount off nothing is nothing. */
+    NO_LIST_PRICE,
 }

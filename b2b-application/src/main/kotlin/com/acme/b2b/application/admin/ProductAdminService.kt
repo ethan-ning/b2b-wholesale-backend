@@ -207,9 +207,16 @@ class ProductAdminService(
      */
     private fun requireSellableIfVisible(product: Product) {
         if (!product.isVisible) return
-        if (product.isSellable()) return
+        val reason = product.unsellableReason() ?: return
         throw UseCaseViolation(
-            "${product.spuCode} has no SKU on sale with a list price, so no dealer could buy it"
+            when (reason) {
+                UnsellableReason.NOTHING_ON_SALE ->
+                    "Every SKU of ${product.spuCode} is discontinued, so there is nothing for a " +
+                        "dealer to buy. The supplier has to list it again before it can be shown."
+                UnsellableReason.NO_LIST_PRICE ->
+                    "${product.spuCode} has no base wholesale price. Every tier's rate comes off " +
+                        "that figure, so at nothing it would be offered free."
+            }
         )
     }
 
@@ -262,7 +269,10 @@ class ProductAdminService(
         val listPrices = product.variants.associate { variant ->
             variant.sku.value to PricingPolicy.listPrice(product, variant)
         }
-        return ProductAssembler.toDTO(product, listPrices, categoryNames, sellable)
+        return ProductAssembler.toDTO(
+            product, listPrices, categoryNames, sellable,
+            unsellableReason = product.unsellableReason()?.name,
+        )
     }
 
     private fun categoryNames(): Map<Long, String> {

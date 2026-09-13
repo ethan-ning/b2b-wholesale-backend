@@ -27,6 +27,7 @@ object ProductAssembler {
         categoryNames: Map<Long, String>,
         sellable: Boolean? = null,
         variants: List<ProductVariant> = product.variants,
+        unsellableReason: String? = null,
     ): ProductDTO =
         ProductDTO(
             id = product.id,
@@ -40,6 +41,7 @@ object ProductAssembler {
             attributes = product.attributes,
             visibility = product.visibility.name,
             sellable = sellable,
+            unsellableReason = unsellableReason,
             categories = product.categoryIds.map { id ->
                 ProductCategoryDTO(
                     id = id,
