@@ -43,10 +43,15 @@ data class TierPriceDTO(
     val sku: String,
     val tierId: Long,
     val tierName: String,
-    /** What this tier actually pays. */
-    val price: BigDecimal,
-    /** The tier's discount applied to list — what an override is departing from. */
-    val standardPrice: BigDecimal,
+    /** The tier every other price is worked out from. Its own price is stated, not derived. */
+    val anchor: Boolean,
+    /** What this tier actually pays. Null when the SKU has no default price. */
+    val price: BigDecimal?,
+    /**
+     * The discount applied to the SKU's default price — what an override departs from.
+     * Null on the anchor tier, which has nothing to depart from.
+     */
+    val standardPrice: BigDecimal?,
     val discountPercent: BigDecimal,
     /** True when someone set this price for this SKU, rather than taking the tier's rate. */
     val customised: Boolean,

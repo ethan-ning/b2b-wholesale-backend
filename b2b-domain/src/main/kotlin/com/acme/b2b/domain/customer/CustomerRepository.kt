@@ -23,6 +23,12 @@ interface CustomerTierRepository {
     fun findById(id: TierId): CustomerTier?
     fun findAll(): List<CustomerTier>
 
+    /**
+     * The tier every other price is worked out from. Exactly one exists — a unique index
+     * says so — and pricing cannot proceed without it.
+     */
+    fun anchor(): CustomerTier
+
     /** Retuning what a tier pays. The only field of a tier the back office can change. */
     fun updateDiscount(id: TierId, discount: DiscountPercent): CustomerTier
 }

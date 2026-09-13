@@ -128,7 +128,11 @@ class CustomerTierDO(
     @Column(name = "sort_order", nullable = false)
     var sortOrder: Int = 0,
 
-    /** So much off list, on everything this tier buys. */
+    /** So much off the anchor tier's price, on everything this tier buys. */
     @Column(name = "discount_percent", nullable = false)
     var discountPercent: BigDecimal = BigDecimal.ZERO,
+
+    /** The tier whose price the others are worked out from. True for exactly one. */
+    @Column(name = "is_anchor", nullable = false)
+    var isAnchor: Boolean = false,
 )

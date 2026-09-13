@@ -8,7 +8,6 @@ import java.math.BigDecimal
  * an edit that silently reverts is worse than no edit at all.
  */
 data class UpdateProductCommand(
-    val baseWholesalePrice: BigDecimal,
     val locationCode: String?,
     val visibility: String,
     val attributes: Map<String, String> = emptyMap(),

@@ -93,11 +93,17 @@ class CatalogQueryService(
      */
     private fun toDTO(product: Product, tier: CustomerTier, categoryNames: Map<Long, String>): ProductDTO {
         val onSale = product.onSaleVariants
-        val priceBook = tierPrices.findFor(onSale.map { it.sku }, tier.id)
-        val resolved: Map<String, ResolvedPrice> = onSale.associate { variant ->
-            variant.sku.value to PricingPolicy.resolve(product, variant, tier, priceBook)
-        }
-        return ProductAssembler.toDTO(product, resolved, categoryNames, variants = onSale)
+        // Both the dealer's tier and the anchor, because a price not stated for the dealer
+        // is worked out from the anchor's.
+        val anchor = tiers.anchor()
+        val priceBook = tierPrices.findAllFor(onSale.map { it.sku })
+            .filter { it.tierId == tier.id || it.tierId == anchor.id }
+        // A SKU with no price at all is left out rather than shown at nothing.
+        val resolved: Map<String, ResolvedPrice> = onSale.mapNotNull { variant ->
+            PricingPolicy.resolve(variant, tier, priceBook, anchor)?.let { variant.sku.value to it }
+        }.toMap()
+        val priced = onSale.filter { it.sku.value in resolved }
+        return ProductAssembler.toDTO(product, resolved, categoryNames, variants = priced)
     }
 
     private fun categoryNames(): Map<Long, String> {

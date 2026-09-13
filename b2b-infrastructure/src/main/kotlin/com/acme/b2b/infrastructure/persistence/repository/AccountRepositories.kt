@@ -93,6 +93,10 @@ class CustomerTierRepositoryImpl(
     override fun findAll(): List<CustomerTier> =
         jpa.findAll().sortedBy { it.sortOrder }.map { converter.toDomain(it) }
 
+    override fun anchor(): CustomerTier =
+        findAll().firstOrNull { it.anchor }
+            ?: throw IllegalStateException("No anchor tier — nothing can be priced without one")
+
     @Transactional
     override fun updateDiscount(id: TierId, discount: DiscountPercent): CustomerTier {
         val row = jpa.findById(id.value).orElseThrow { NoSuchElementException("No such tier") }

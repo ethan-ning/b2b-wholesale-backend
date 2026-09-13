@@ -49,8 +49,16 @@ class ProductAdminService(
         )
         val page = products.search(criteria, Page(query.page, query.size))
         val names = categoryNames()
+        // One query for the whole page, not one per product.
+        val anchorId = tiers.anchor().id
+        val priced = tierPrices
+            .findAllFor(page.content.flatMap { product -> product.variants.map { it.sku } })
+            .filter { it.tierId == anchorId }
+            .map { it.sku }
+            .toSet()
+
         return PagedDTO(
-            content = page.content.map { toDto(it, names, sellable = it.isSellable()) },
+            content = page.content.map { toDto(it, names, sellable = it.isSellable(priced)) },
             totalElements = page.totalElements,
             totalPages = page.totalPages,
             page = page.page.number,
@@ -68,7 +76,7 @@ class ProductAdminService(
      * not — the edit form is the one screen that can do something about it.
      */
     private fun detailOf(product: Product) = AdminProductDTO(
-        product = toDto(product, categoryNames(), sellable = product.isSellable()),
+        product = toDto(product, categoryNames(), sellable = product.isSellable(pricedSkusOf(product))),
         tierPrices = priceBookOf(product),
         stockByWarehouse = stockOf(product),
     )
@@ -108,7 +116,7 @@ class ProductAdminService(
             description = existing.description,
             variantAxis = existing.variantAxis,
             // Ours.
-            baseWholesalePrice = Money.of(command.baseWholesalePrice),
+            baseWholesalePrice = existing.baseWholesalePrice,
             locationCode = command.locationCode,
             attributes = command.attributes,
             visibility = parseVisibility(command.visibility),
@@ -129,7 +137,7 @@ class ProductAdminService(
         // back on refusal.
         requireSellableIfVisible(saved)
 
-        return detailOf(saved)
+        return detailOf(refreshReferencePrice(saved))
     }
 
     /**
@@ -204,15 +212,15 @@ class ProductAdminService(
      */
     private fun requireSellableIfVisible(product: Product) {
         if (!product.isVisible) return
-        val reason = product.unsellableReason() ?: return
+        val reason = product.unsellableReason(pricedSkusOf(product)) ?: return
         throw UseCaseViolation(
             when (reason) {
                 UnsellableReason.NOTHING_ON_SALE ->
                     "Every SKU of ${product.spuCode} is discontinued, so there is nothing for a " +
                         "dealer to buy. The supplier has to list it again before it can be shown."
-                UnsellableReason.NO_LIST_PRICE ->
-                    "${product.spuCode} has no base wholesale price. Every tier's rate comes off " +
-                        "that figure, so at nothing it would be offered free."
+                UnsellableReason.NO_DEFAULT_PRICE ->
+                    "A SKU of ${product.spuCode} still on sale has no default price. Every other " +
+                        "tier is worked out from that figure, so the SKU has no price at all."
             }
         )
     }
@@ -225,26 +233,59 @@ class ProductAdminService(
      * means one place decides what a tier pays. Left to the client, the discount
      * arithmetic would be stated twice and would eventually disagree with the dealer's.
      */
+    /**
+     * Keeps the product's search figure in step with its prices.
+     *
+     * Nothing prices anything from it. Filtering and sorting a result list needs one
+     * number per product, and the cheapest default price among the SKUs on sale is the
+     * one the dealer's card already shows as "from $X".
+     */
+    private fun refreshReferencePrice(product: Product): Product {
+        val anchorId = tiers.anchor().id
+        val onSale = product.onSaleVariants.map { it.sku }.toSet()
+        val cheapest = tierPrices.findAllFor(onSale)
+            .filter { it.tierId == anchorId && it.sku in onSale }
+            .minOfOrNull { it.price }
+            ?: Money.ZERO
+        if (cheapest == product.baseWholesalePrice) return product
+        return products.save(product.withReferencePrice(cheapest))
+    }
+
+    /**
+     * SKUs carrying a default price. Every other tier is worked out from it, so a SKU
+     * without one has no price at any tier.
+     */
+    private fun pricedSkusOf(product: Product): Set<SkuCode> {
+        val anchorId = tiers.anchor().id
+        return tierPrices.findAllFor(product.variants.map { it.sku })
+            .filter { it.tierId == anchorId }
+            .map { it.sku }
+            .toSet()
+    }
+
     private fun priceBookOf(product: Product): List<TierPriceDTO> {
         val allTiers = tiers.findAll()
-        val overrides = tierPrices.findAllFor(product.variants.map { it.sku })
-            .associateBy { it.sku to it.tierId }
+        val anchor = tiers.anchor()
+        val book = tierPrices.findAllFor(product.variants.map { it.sku })
+        val stated = book.associateBy { it.sku to it.tierId }
 
         return product.variants.flatMap { variant ->
             allTiers.map { tier ->
-                val override = overrides[variant.sku to tier.id]
-                val standard = PricingPolicy.standardPrice(product, variant, tier)
-                val price = override?.price ?: standard
+                val own = stated[variant.sku to tier.id]
+                val standard = PricingPolicy.standardPrice(variant, tier, book, anchor)
+                val price = own?.price ?: standard
                 TierPriceDTO(
                     sku = variant.sku.value,
                     tierId = tier.id.value,
                     tierName = tier.name,
-                    price = price.amount,
-                    standardPrice = standard.amount,
+                    anchor = tier.anchor,
+                    price = price?.amount,
+                    standardPrice = standard?.amount,
                     discountPercent = tier.discount.value,
-                    customised = override != null,
-                    breachesMap = PricingPolicy.breachesMap(variant, price),
-                    minQty = override?.minQty?.value ?: 1,
+                    // The anchor's own price is always stated; nothing derives it.
+                    customised = own != null && !tier.anchor,
+                    breachesMap = price != null && PricingPolicy.breachesMap(variant, price),
+                    minQty = own?.minQty?.value ?: 1,
                 )
             }
         }
@@ -263,12 +304,15 @@ class ProductAdminService(
         categoryNames: Map<Long, String>,
         sellable: Boolean? = null,
     ): ProductDTO {
-        val listPrices = product.variants.associate { variant ->
-            variant.sku.value to PricingPolicy.listPrice(product, variant)
-        }
+        // The admin catalogue shows each SKU's anchor price — what a Default dealer pays.
+        val anchor = tiers.anchor()
+        val book = tierPrices.findAllFor(product.variants.map { it.sku })
+        val prices = product.variants.mapNotNull { variant ->
+            PricingPolicy.resolve(variant, anchor, book, anchor)?.let { variant.sku.value to it }
+        }.toMap()
         return ProductAssembler.toDTO(
-            product, listPrices, categoryNames, sellable,
-            unsellableReason = product.unsellableReason()?.name,
+            product, prices, categoryNames, sellable,
+            unsellableReason = product.unsellableReason(pricedSkusOf(product))?.name,
         )
     }
 

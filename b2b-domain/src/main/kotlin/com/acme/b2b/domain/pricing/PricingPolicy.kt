@@ -1,71 +1,81 @@
 package com.acme.b2b.domain.pricing
 
-import com.acme.b2b.domain.catalog.Product
 import com.acme.b2b.domain.catalog.ProductVariant
+import com.acme.b2b.domain.customer.CustomerTier
 import com.acme.b2b.types.Money
 import com.acme.b2b.types.Quantity
-import com.acme.b2b.domain.customer.CustomerTier
 
 /**
- * Resolves what a dealer pays for one SKU. A domain service: pure business rule with
- * no I/O, so it is unit-testable with no container and callers supply the rows.
+ * What a dealer pays for one SKU. A domain service: pure business rule with no I/O, so it
+ * is unit-testable with no container and callers supply the rows.
  *
- * A per-SKU row wins; failing that the tier's standing discount comes off list. There is
- * no third case — every tier carries a discount, even if it is nothing, so no SKU can be
- * unpriced and nothing here has to treat that as a state.
+ * One rule, and everything is a case of it:
+ *
+ *     a price set for this SKU and this tier, or failing that
+ *     the SKU's anchor price less this tier's discount
+ *
+ * The anchor tier has no second case — its price is the one that is stated, not derived —
+ * so a SKU with no anchor price has no price at all, and [resolve] says so by returning
+ * null rather than inventing one.
+ *
+ * Supplier cost is not in here. It is what the business pays, not what a dealer does.
  */
 object PricingPolicy {
 
     fun resolve(
-        product: Product,
         variant: ProductVariant,
         tier: CustomerTier,
         priceBook: List<TierPrice>,
+        anchor: CustomerTier,
         quantity: Quantity = Quantity.ONE,
-    ): ResolvedPrice {
-        val row = priceBook
-            .filter { it.sku == variant.sku && it.tierId == tier.id && it.appliesTo(quantity) }
-            .maxByOrNull { it.minQty.value }
-
-        if (row != null) {
-            return ResolvedPrice(row.price, variant.perUnit(row.price), PriceSource.TIER_PRICE)
+    ): ResolvedPrice? {
+        stated(variant, tier, priceBook, quantity)?.let {
+            return ResolvedPrice(it, variant.perUnit(it), PriceSource.STATED)
         }
-        val standard = standardPrice(product, variant, tier)
-        return ResolvedPrice(standard, variant.perUnit(standard), PriceSource.TIER_DISCOUNT)
+        if (tier.anchor) return null
+
+        val anchorPrice = stated(variant, anchor, priceBook, quantity) ?: return null
+        val price = anchorPrice.lessDiscount(tier.discount)
+        return ResolvedPrice(price, variant.perUnit(price), PriceSource.DISCOUNTED)
     }
 
     /**
-     * What the tier pays without anyone having said otherwise. Separate because the admin
-     * screens show it alongside an override, to say what the override is departing from.
-     *
-     * Pack quantity does not come into it. The base price is what a SKU lists at, whatever
-     * is in the box; a pack that genuinely costs more than a single is said so with a
-     * per-SKU price, not worked out by multiplying.
+     * What this tier would pay without a price of its own — what an override departs from.
+     * Null for the anchor tier, which has nothing to depart from.
      */
-    fun standardPrice(product: Product, variant: ProductVariant, tier: CustomerTier): Money =
-        product.baseWholesalePrice.lessDiscount(tier.discount)
-
-    /**
-     * List price, for a screen with no dealer in it.
-     *
-     * The admin catalogue shows what a SKU lists at, not what anybody pays. It asks for
-     * that directly rather than resolving against an invented tier — a made-up tier id
-     * has to be a real one to satisfy [TierId], so it would have to belong to some dealer
-     * and would quietly become their price if the resolution ever changed.
-     */
-    fun listPrice(product: Product, variant: ProductVariant): ResolvedPrice {
-        val price = product.baseWholesalePrice
-        return ResolvedPrice(price, variant.perUnit(price), PriceSource.LIST)
+    fun standardPrice(
+        variant: ProductVariant,
+        tier: CustomerTier,
+        priceBook: List<TierPrice>,
+        anchor: CustomerTier,
+    ): Money? {
+        if (tier.anchor) return null
+        return stated(variant, anchor, priceBook, Quantity.ONE)?.lessDiscount(tier.discount)
     }
+
+    /** The SKU's anchor price: the figure every other tier is worked out from. */
+    fun anchorPrice(variant: ProductVariant, priceBook: List<TierPrice>, anchor: CustomerTier): Money? =
+        stated(variant, anchor, priceBook, Quantity.ONE)
 
     /** True when [price] would breach the SKU's advertised floor — a data-entry error. */
     fun breachesMap(variant: ProductVariant, price: Money): Boolean =
         !variant.mapCoversPrice(price)
+
+    /** The row someone set for this SKU and tier, taking the best applicable volume break. */
+    private fun stated(
+        variant: ProductVariant,
+        tier: CustomerTier,
+        priceBook: List<TierPrice>,
+        quantity: Quantity,
+    ): Money? = priceBook
+        .filter { it.sku == variant.sku && it.tierId == tier.id && it.appliesTo(quantity) }
+        .maxByOrNull { it.minQty.value }
+        ?.price
 }
 
 /**
- * [forOneSku] is the price of one SKU — a garment, or a whole 6-pack. [perUnit] divides
- * it by pack quantity so a pack stays comparable with a single.
+ * [forOneSku] is the price of one SKU — a garment, or a whole 6-pack. [perUnit] divides it
+ * by pack quantity so a pack stays comparable with a single.
  */
 data class ResolvedPrice(
     val forOneSku: Money,
@@ -75,9 +85,7 @@ data class ResolvedPrice(
 
 enum class PriceSource {
     /** Someone set this price for this SKU and this tier. */
-    TIER_PRICE,
-    /** Nobody did, so the tier's standing discount came off list. */
-    TIER_DISCOUNT,
-    /** Not a dealer's price at all — what the SKU lists at, for the back office. */
-    LIST,
+    STATED,
+    /** Nobody did, so the tier's discount came off the SKU's anchor price. */
+    DISCOUNTED,
 }

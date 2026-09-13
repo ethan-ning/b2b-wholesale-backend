@@ -76,5 +76,6 @@ class AccountDataConverter {
         name = row.name,
         sortOrder = row.sortOrder,
         discount = DiscountPercent.of(row.discountPercent),
+        anchor = row.isAnchor,
     )
 }

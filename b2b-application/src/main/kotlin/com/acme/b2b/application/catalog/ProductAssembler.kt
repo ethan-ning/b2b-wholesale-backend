@@ -60,13 +60,15 @@ object ProductAssembler {
                 )
             },
             variants = variants.map { variant ->
-                toDTO(variant, prices.getValue(variant.sku.value), product.images)
+                // Null for a SKU nobody has priced — the admin sees those, a dealer never
+                // does, because an unpriced SKU is left out of the dealer's response.
+                toDTO(variant, prices[variant.sku.value], product.images)
             },
         )
 
     private fun toDTO(
         variant: ProductVariant,
-        price: ResolvedPrice,
+        price: ResolvedPrice?,
         gallery: List<ProductImageRef>,
     ): VariantDTO =
         VariantDTO(
@@ -77,8 +79,8 @@ object ProductAssembler {
             upc = variant.upc,
             weight = variant.weight,
             status = if (variant.active) "ACTIVE" else "DISCONTINUED",
-            tierPrice = price.forOneSku.amount,
-            unitPrice = price.perUnit.amount,
+            tierPrice = price?.forOneSku?.amount,
+            unitPrice = price?.perUnit?.amount,
             mapPrice = variant.mapPrice?.amount,
             mainImageId = variant.mainImageId,
             mainImageUrl = gallery.firstOrNull { it.id == variant.mainImageId }?.url

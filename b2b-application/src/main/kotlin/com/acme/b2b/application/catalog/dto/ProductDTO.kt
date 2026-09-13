@@ -49,10 +49,13 @@ data class VariantDTO(
     val upc: String?,
     val weight: BigDecimal?,
     val status: String,
-    /** What the dealer pays for one of this SKU — a garment, or a whole pack. */
-    val tierPrice: BigDecimal,
+    /**
+     * What the dealer pays for one of this SKU — a garment, or a whole pack. Null when
+     * nobody has priced it, which the back office sees and a dealer never does.
+     */
+    val tierPrice: BigDecimal?,
     /** tierPrice / packQuantity, so a pack compares against a single. */
-    val unitPrice: BigDecimal,
+    val unitPrice: BigDecimal?,
     val mapPrice: BigDecimal?,
     /** Which of the product's images stands for this SKU, or null if nobody has chosen one. */
     val mainImageId: Long?,

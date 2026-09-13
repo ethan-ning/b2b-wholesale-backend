@@ -66,8 +66,9 @@ class InMemoryCustomerRepository(seed: List<Customer> = emptyList()) : CustomerR
 
 class InMemoryTierRepository(
     seed: List<CustomerTier> = listOf(
-        // The three the portal ships with: one paying list, two with a standing discount.
-        CustomerTier(TierId(3), "Default", 1, DiscountPercent.NONE),
+        // The three the portal ships with. Default is the anchor: its price is stated per
+        // SKU, and the other two take their discount off it.
+        CustomerTier(TierId(3), "Default", 1, DiscountPercent.NONE, anchor = true),
         CustomerTier(TierId(2), "Silver", 2, DiscountPercent.of(7)),
         CustomerTier(TierId(1), "Gold", 3, DiscountPercent.of(18)),
     ),
@@ -76,6 +77,8 @@ class InMemoryTierRepository(
 
     override fun findById(id: TierId) = tiers.firstOrNull { it.id == id }
     override fun findAll() = tiers.sortedBy { it.sortOrder }
+
+    override fun anchor() = tiers.first { it.anchor }
 
     override fun updateDiscount(id: TierId, discount: DiscountPercent): CustomerTier {
         val index = tiers.indexOfFirst { it.id == id }

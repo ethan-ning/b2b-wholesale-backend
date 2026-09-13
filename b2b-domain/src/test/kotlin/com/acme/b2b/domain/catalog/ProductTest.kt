@@ -100,24 +100,23 @@ class ProductTest {
         assertFalse(gloves.variants.last().stock.isOutOfStock)
     }
 
-    /**
-     * No longer "every SKU has a tier price" — tiers carry a standing discount, so a
-     * price exists from import. What is left is the hazard that rule was really guarding.
-     */
     @Test
-    fun `a product with SKUs and a list price is sellable, without anyone pricing a SKU`() {
+    fun `a product is sellable once every SKU on sale has a default price`() {
         val gloves = product(
             variants = listOf(variant("GL100-BLK-S", "S"), variant("GL100-BLK-M", "M")),
             axis = VariantAxis.SIZE,
         )
 
-        assertTrue(gloves.isSellable())
+        assertTrue(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"), SkuCode("GL100-BLK-M"))))
+        // Every other tier is worked out from that price, so one SKU short is not "cheap
+        // on one size" — it is a size with no price at all.
+        assertFalse(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"))))
+        assertFalse(gloves.isSellable(emptySet()))
     }
 
     @Test
-    fun `a product with no list price is not sellable at any discount`() {
-        // A discount off nothing is nothing. Visible, this would be offered free.
-        assertFalse(product(basePrice = "0.00").isSellable())
+    fun `the product's cost has nothing to do with whether it can be sold`() {
+        assertTrue(product(basePrice = "0.00").isSellable(setOf(SkuCode("GL100-BLK-M"))))
     }
 
     /** The same SKU as the supplier would leave it after withdrawing it. */
@@ -152,7 +151,7 @@ class ProductTest {
             axis = VariantAxis.SIZE,
         )
 
-        assertTrue(gloves.isSellable())
+        assertTrue(gloves.isSellable(setOf(SkuCode("GL100-BLK-S"))))
     }
 
     @Test
@@ -163,13 +162,13 @@ class ProductTest {
             ),
         )
 
-        assertFalse(gone.isSellable())
+        assertFalse(gone.isSellable(setOf(SkuCode("GL100-BLK-S"))))
     }
 
     @Test
-    fun `a freshly imported product is sellable as soon as it has a list price`() {
-        // An import arrives with no tier prices at all. Its tier's discount is enough.
-        assertTrue(product().isSellable())
+    fun `a freshly imported product is not sellable until its SKUs are priced`() {
+        // An import arrives with no prices at all, and nothing derives one for it.
+        assertFalse(product().isSellable(emptySet()))
     }
 
     @Test

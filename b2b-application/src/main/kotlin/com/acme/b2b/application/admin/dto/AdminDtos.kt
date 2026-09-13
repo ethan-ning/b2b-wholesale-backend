@@ -43,8 +43,10 @@ data class CustomerTierDTO(
     val id: Long,
     val name: String,
     val sortOrder: Int,
-    /** So much off list, on everything this tier buys. */
+    /** So much off the anchor tier's price, on everything this tier buys. */
     val discountPercent: BigDecimal,
+    /** The tier the others are worked out from. Its discount is not applied to anything. */
+    val anchor: Boolean,
 )
 
 /**

@@ -67,20 +67,33 @@ class Product(
      * unpriced — but a discount off nothing is nothing, and an import arriving without a
      * list price would be offered free.
      */
-    fun isSellable(): Boolean = unsellableReason() == null
+    fun isSellable(pricedSkus: Set<SkuCode>): Boolean = unsellableReason(pricedSkus) == null
 
     /**
      * Why this product could not be shown, or null if it could.
      *
-     * Two separate conditions, reported separately. Said in one sentence — "no SKU on
-     * sale with a list price" — a reader cannot tell which of them failed, and the half
-     * that did not sends them looking for a setting that does not exist.
+     * Two separate conditions, reported separately: said in one sentence, a reader cannot
+     * tell which failed, and the half that did not applies sends them looking for a
+     * setting that does not exist.
+     *
+     * [pricedSkus] is the SKUs carrying a default price. Every SKU still on sale needs
+     * one, because every other tier is worked out from it — an unpriced SKU has no price
+     * at any tier, not a cheap one.
      */
-    fun unsellableReason(): UnsellableReason? = when {
+    fun unsellableReason(pricedSkus: Set<SkuCode>): UnsellableReason? = when {
         onSaleVariants.isEmpty() -> UnsellableReason.NOTHING_ON_SALE
-        baseWholesalePrice.isZero() -> UnsellableReason.NO_LIST_PRICE
+        onSaleVariants.any { it.sku !in pricedSkus } -> UnsellableReason.NO_DEFAULT_PRICE
         else -> null
     }
+
+    /**
+     * The same product with its search figure brought up to date. Derived from the SKUs'
+     * default prices; nothing is priced from it.
+     */
+    fun withReferencePrice(price: Money) = Product(
+        id, spuCode, name, brand, description, price, locationCode, variantAxis,
+        attributes, visibility, categoryIds, primaryCategoryId, images, variants,
+    )
 
     /**
      * Returns the same product in a different visibility state. Everything else is carried
@@ -122,6 +135,6 @@ enum class UnsellableReason {
     /** Every SKU is discontinued, so there is nothing to sell — not a pricing problem. */
     NOTHING_ON_SALE,
 
-    /** No list price, and a tier discount off nothing is nothing. */
-    NO_LIST_PRICE,
+    /** A SKU still on sale has no default price, so no tier has one either. */
+    NO_DEFAULT_PRICE,
 }
