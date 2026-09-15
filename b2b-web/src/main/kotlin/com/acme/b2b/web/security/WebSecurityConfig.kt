@@ -1,5 +1,6 @@
 package com.acme.b2b.web.security
 
+import com.acme.b2b.web.SpaRoutes
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -62,12 +63,7 @@ class WebSecurityConfig(
                     // index.html to everyone, and the data behind them still comes from
                     // /api, which is not on this list. /assets/** is what the bundler emits,
                     // /brand/** what it copies through untouched.
-                    .requestMatchers(
-                        HttpMethod.GET,
-                        "/", "/index.html", "/favicon.svg", "/assets/**", "/brand/**", "/local-images/**",
-                        "/login", "/change-password", "/search", "/products/**", "/admin/**",
-                        "/forgot-password", "/reset-password",
-                    ).permitAll()
+                    .requestMatchers(HttpMethod.GET, *SpaRoutes.PUBLIC_GETS).permitAll()
                     // Anyone still on a password somebody else generated holds a token whose
                     // only reachable endpoint is their own change-password one. That is what
                     // makes the forced change enforced rather than asked of the client.

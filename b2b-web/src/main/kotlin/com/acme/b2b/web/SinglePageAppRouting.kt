@@ -12,8 +12,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
  * path no controller serves. Without this they get a 404 for a page that exists — the
  * router would have drawn it, had it been given the chance to load.
  *
- * Only the two path shapes the app actually uses, rather than a catch-all: a genuine typo
- * under /api should still be a 404 rather than a page, and so should a missing asset.
+ * The list lives in [SpaRoutes] because the security rules need the same one — a path
+ * forwarded here but not permitted there, or the reverse, answers 401 on a public page.
  *
  * Off unless the app is packaged with a UI to serve. Running the API alone — which is what
  * happens in development, where Vite serves the app — these routes would answer for
@@ -24,7 +24,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 class SinglePageAppRouting : WebMvcConfigurer {
 
     override fun addViewControllers(registry: ViewControllerRegistry) {
-        listOf("/admin/**", "/products/**", "/search", "/login", "/change-password")
+        SpaRoutes.CLIENT_ROUTES
             .forEach { registry.addViewController(it).setViewName("forward:/index.html") }
     }
 }
