@@ -11,6 +11,7 @@ import com.acme.b2b.domain.common.Page
 import com.acme.b2b.domain.customer.*
 import com.acme.b2b.types.Email
 import com.acme.b2b.types.TierId
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import com.acme.b2b.types.DiscountPercent
@@ -29,6 +30,8 @@ class CustomerAdminService(
     private val passwordHasher: PasswordHasher,
     private val temporaryPasswords: TemporaryPasswordGenerator,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     fun list(query: CustomerQuery): PagedDTO<CustomerDTO> {
         val criteria = CustomerSearchCriteria(
@@ -65,6 +68,7 @@ class CustomerAdminService(
             .getOrElse { throw UseCaseViolation(it.message ?: "That is not a usable discount") }
         val tier = tiers.findById(TierId(tierId))
             ?: throw NoSuchElementException("No such tier")
+        log.info("Tier {} discount set to {} percent", tier.id.value, percent)
         return AdminAssembler.toDTO(tiers.updateDiscount(tier.id, discount))
     }
 
@@ -91,6 +95,7 @@ class CustomerAdminService(
         )
 
         val saved = customers.save(customer)
+        log.info("Dealer {} created on tier {}", saved.id, saved.tierId.value)
         return CustomerCreatedDTO(
             customer = AdminAssembler.toDTO(saved, tierNames()),
             temporaryPassword = temporary.value,
@@ -124,6 +129,7 @@ class CustomerAdminService(
 
         val temporary = temporaryPasswords.generate()
         val saved = customers.save(existing.withResetPassword(passwordHasher.hash(temporary)))
+        log.warn("A new password was issued for dealer {}", saved.id)
 
         return CustomerCreatedDTO(
             customer = AdminAssembler.toDTO(saved, tierNames()),

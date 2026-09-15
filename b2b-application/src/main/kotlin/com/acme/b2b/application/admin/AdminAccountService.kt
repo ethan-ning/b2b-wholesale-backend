@@ -15,6 +15,7 @@ import com.acme.b2b.domain.auth.PasswordHasher
 import com.acme.b2b.domain.auth.TemporaryPasswordGenerator
 import com.acme.b2b.types.Email
 import com.acme.b2b.types.RawPassword
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -33,6 +34,8 @@ class AdminAccountService(
     private val tokens: AccessTokenIssuer,
     private val context: AdminContext,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /** Visible to any admin: knowing who else holds the keys is not a privilege. */
     fun list(): List<AdminUserDTO> =
@@ -65,6 +68,7 @@ class AdminAccountService(
         }
 
         val updated = admins.save(admin.withChosenPassword(passwordHasher.hash(replacement)))
+        log.info("Admin {} changed their own password", updated.id)
         val id = checkNotNull(updated.id) { "A persisted admin must have an id" }
         return AdminLoginResponse(
             token = tokens.issueForAdmin(id, updated.email.value, updated.role.name),
@@ -74,7 +78,7 @@ class AdminAccountService(
 
     @Transactional
     fun create(command: CreateAdminCommand): AdminCreatedDTO {
-        requireManager()
+        val manager = requireManager()
 
         val email = Email.of(command.email)
         if (admins.existsByEmail(email)) {
@@ -93,6 +97,7 @@ class AdminAccountService(
                 role = role,
             )
         )
+        log.info("Admin {} created admin {} with role {}", manager.id, created.id, created.role)
         return AdminCreatedDTO(AdminAssembler.toDTO(created), temporary.value)
     }
 
@@ -110,6 +115,7 @@ class AdminAccountService(
 
         val temporary = temporaryPasswords.generate()
         val reset = admins.save(target.withIssuedPassword(passwordHasher.hash(temporary)))
+        log.warn("Admin {} issued a new password for admin {}", manager.id, reset.id)
         return AdminCreatedDTO(AdminAssembler.toDTO(reset), temporary.value)
     }
 
@@ -130,6 +136,7 @@ class AdminAccountService(
         }
 
         admins.deleteById(id)
+        log.warn("Admin {} removed admin {} ({})", manager.id, id, target.role)
     }
 
     private fun caller(): AdminUser {

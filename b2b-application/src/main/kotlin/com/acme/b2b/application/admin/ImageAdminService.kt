@@ -14,6 +14,7 @@ import com.acme.b2b.domain.catalog.ImageUsage
 import com.acme.b2b.domain.catalog.ProductImageRepository
 import com.acme.b2b.domain.catalog.ProductRepository
 import com.acme.b2b.domain.common.Page
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -31,6 +32,8 @@ class ImageAdminService(
     private val products: ProductRepository,
     private val store: ImageStore,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     fun library(search: String?, unusedOnly: Boolean, page: Page): ImageLibraryDTO {
         val found = images.findPageWithUsage(ImageSearch(search, unusedOnly), page)
@@ -97,6 +100,7 @@ class ImageAdminService(
         images.deleteById(imageId)
         // After the row, so a bucket failure does not leave a row pointing at nothing.
         image.objectKey?.let(store::delete)
+        log.warn("Image {} ({}) deleted", imageId, image.filename)
     }
 
     @Transactional
