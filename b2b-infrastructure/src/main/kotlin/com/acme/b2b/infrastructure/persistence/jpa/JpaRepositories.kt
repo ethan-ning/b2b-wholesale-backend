@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.domain.Page as SpringPage
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.query.Param
+import java.time.Instant
 
 /**
  * Spring Data interfaces — the DAO layer. Not exposed beyond infrastructure: the
@@ -212,4 +213,36 @@ interface ProductImageJpaRepository : JpaRepository<ProductImageDO, Long> {
     fun findByImageIdIn(imageIds: Collection<Long>): List<ProductImageDO>
     fun countByProductId(productId: Long): Long
     fun findByProductIdAndImageId(productId: Long, imageId: Long): ProductImageDO?
+}
+
+/**
+ * Reset links. The digest lookup is the hot path; the two @Modifying queries are the
+ * invalidate-previous sweep and the housekeeping delete.
+ */
+interface PasswordResetTokenJpaRepository : JpaRepository<PasswordResetTokenDO, Long> {
+
+    fun findByTokenDigest(tokenDigest: String): PasswordResetTokenDO?
+
+    /**
+     * Spends every live link for one account in a single statement. Done in SQL rather
+     * than by loading and saving each row: the point is that no gap exists in which two
+     * links are usable at once.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        UPDATE PasswordResetTokenDO t
+        SET t.usedAt = :now
+        WHERE t.audience = :audience AND t.subjectId = :subjectId AND t.usedAt IS NULL
+        """
+    )
+    fun markUsed(
+        @Param("audience") audience: String,
+        @Param("subjectId") subjectId: Long,
+        @Param("now") now: Instant,
+    ): Int
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM PasswordResetTokenDO t WHERE t.expiresAt < :cutoff")
+    fun deleteExpiredBefore(@Param("cutoff") cutoff: Instant): Int
 }

@@ -102,6 +102,10 @@ jobs:
             echo "  PUBLIC_ORIGIN = https://portal.example.com"
             exit 1
           fi
+          # --set-env-vars uses ^##^, not ^@^: the mail settings carry email
+          # addresses, and @ as the delimiter would split them in half. No value
+          # below contains #. (A comment between \-continued lines would end the
+          # command, so it belongs here rather than inline.)
           gcloud run deploy "$SERVICE" \
             --image="$REGION-docker.pkg.dev/$PROJECT_ID/b2b/$SERVICE:$GITHUB_SHA" \
             --region="$REGION" \
@@ -110,8 +114,8 @@ jobs:
             --min-instances=1 --no-cpu-throttling \
             --memory=1Gi --cpu=1 --timeout=300 \
             --vpc-egress=all-traffic --network=b2b --subnet=b2b \
-            --set-env-vars="^@^DB_URL=jdbc:postgresql:///b2b?cloudSqlInstance=$SQL&socketFactory=com.google.cloud.sql.postgres.SocketFactory@DB_USER=b2b@SELLFOX_SCHEDULE_ENABLED=true@APP_CORS_ALLOWED_ORIGINS=$ORIGINS@APP_IMAGES_BUCKET=woltaphor-b2b-images" \
-            --set-secrets="DB_PASSWORD=b2b-db-password:latest,JWT_SECRET=b2b-jwt-secret:latest,SELLFOX_APP_ID=sellfox-app-id:latest,SELLFOX_APP_SECRET=sellfox-app-secret:latest"
+            --set-env-vars="^##^DB_URL=jdbc:postgresql:///b2b?cloudSqlInstance=$SQL&socketFactory=com.google.cloud.sql.postgres.SocketFactory##DB_USER=b2b##SELLFOX_SCHEDULE_ENABLED=true##APP_CORS_ALLOWED_ORIGINS=$ORIGINS##APP_IMAGES_BUCKET=woltaphor-b2b-images##APP_MAIL_HOST=smtppro.zoho.sg##APP_MAIL_PORT=587##APP_MAIL_USERNAME=admin@woltaphor.com##APP_MAIL_FROM=no-reply@woltaphor.com" \
+            --set-secrets="DB_PASSWORD=b2b-db-password:latest,JWT_SECRET=b2b-jwt-secret:latest,SELLFOX_APP_ID=sellfox-app-id:latest,SELLFOX_APP_SECRET=sellfox-app-secret:latest,APP_MAIL_PASSWORD=b2b-mail-password:latest"
 
       - name: Check it answers
         run: |

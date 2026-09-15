@@ -83,6 +83,7 @@ class AdminApiSecurityTest {
     @MockitoBean private lateinit var inventoryQuery: InventoryQueryService
     @MockitoBean private lateinit var dashboard: DashboardService
     @MockitoBean private lateinit var dealerAuth: DealerAuthService
+    @MockitoBean private lateinit var passwordResets: com.acme.b2b.application.auth.PasswordResetService
     @MockitoBean private lateinit var sellfoxAdmin: com.acme.b2b.application.sellfox.SellfoxAdminService
     @MockitoBean private lateinit var sellfoxSync: com.acme.b2b.application.sellfox.SellfoxSyncService
 
@@ -335,4 +336,26 @@ class AdminApiSecurityTest {
         jwt.sign(MACSigner(secret.toByteArray()))
         return jwt.serialize()
     }
+
+    /**
+     * Forgotten-password endpoints must be reachable without a token — whoever needs them
+     * cannot obtain one. Four separate assertions rather than one loop: each is a distinct
+     * rule in WebSecurityConfig, and a loop would pass if three were right.
+     */
+    @Test
+    fun `password reset endpoints are reachable without a token`() {
+        for (path in listOf("/api/auth/forgot-password", "/api/admin/auth/forgot-password")) {
+            mockMvc.perform(
+                post(path).contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"email":"someone@example.com"}""")
+            ).andExpect(status().isOk)
+        }
+        for (path in listOf("/api/auth/reset-password", "/api/admin/auth/reset-password")) {
+            mockMvc.perform(
+                post(path).contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"token":"a-token","newPassword":"a-new-password"}""")
+            ).andExpect(status().isOk)
+        }
+    }
+
 }

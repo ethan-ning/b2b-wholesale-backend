@@ -47,6 +47,14 @@ class WebSecurityConfig(
                 auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/auth/login", "/api/admin/auth/login").permitAll()
+                    // Forgotten-password endpoints cannot require a token: whoever needs
+                    // them is precisely the person unable to obtain one. Neither reveals
+                    // whether an account exists, and the reset link itself is the
+                    // credential — see PasswordResetService.
+                    .requestMatchers(
+                        "/api/auth/forgot-password", "/api/auth/reset-password",
+                        "/api/admin/auth/forgot-password", "/api/admin/auth/reset-password",
+                    ).permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     // The single-page app: its files and its routes, because a browser
                     // opening /admin/login has no token yet and the page it needs in order
@@ -58,6 +66,7 @@ class WebSecurityConfig(
                         HttpMethod.GET,
                         "/", "/index.html", "/favicon.svg", "/assets/**", "/brand/**", "/local-images/**",
                         "/login", "/change-password", "/search", "/products/**", "/admin/**",
+                        "/forgot-password", "/reset-password",
                     ).permitAll()
                     // Anyone still on a password somebody else generated holds a token whose
                     // only reachable endpoint is their own change-password one. That is what

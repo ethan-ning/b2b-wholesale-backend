@@ -77,6 +77,27 @@ server:
 app:
   serve-spa: ${APP_SERVE_SPA:false}
 
+  portal:
+    # Where the reset link points. Must be the address a dealer actually opens, not the
+    # Cloud Run URL — a link to the wrong host still works but looks like a phish.
+    base-url: ${APP_PORTAL_BASE_URL:https://b2b.woltaphor.com}
+
+  password-reset:
+    # Long enough to survive a mail queue and a coffee break; short enough that a message
+    # sitting in an archive stops being a key to the account.
+    ttl-minutes: ${APP_PASSWORD_RESET_TTL_MINUTES:60}
+
+  mail:
+    # Unset means reset links are written to the log instead of sent — see MailConfig.
+    # Any provider that speaks SMTP fits here: Workspace, SendGrid, Resend, Postmark.
+    host: ${APP_MAIL_HOST:}
+    port: ${APP_MAIL_PORT:587}
+    username: ${APP_MAIL_USERNAME:}
+    password: ${APP_MAIL_PASSWORD:}
+    from: ${APP_MAIL_FROM:no-reply@woltaphor.com}
+    from-name: ${APP_MAIL_FROM_NAME:Woltaphor}
+    starttls: ${APP_MAIL_STARTTLS:true}
+
 logging:
   level:
     root: INFO

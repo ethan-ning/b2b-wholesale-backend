@@ -58,6 +58,7 @@ class DeployedOriginCorsTest {
     @MockitoBean private lateinit var inventoryQuery: InventoryQueryService
     @MockitoBean private lateinit var dashboard: DashboardService
     @MockitoBean private lateinit var dealerAuth: DealerAuthService
+    @MockitoBean private lateinit var passwordResets: com.acme.b2b.application.auth.PasswordResetService
     @MockitoBean private lateinit var sellfoxAdmin: com.acme.b2b.application.sellfox.SellfoxAdminService
     @MockitoBean private lateinit var sellfoxSync: com.acme.b2b.application.sellfox.SellfoxSyncService
 

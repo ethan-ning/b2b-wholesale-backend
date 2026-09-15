@@ -86,15 +86,16 @@ printf '%s' '<the database password>'    | gcloud secrets create b2b-db-password
 printf '%s' "$(openssl rand -base64 48)" | gcloud secrets create b2b-jwt-secret --data-file=-
 printf '%s' '<sellfox app id>'           | gcloud secrets create sellfox-app-id --data-file=-
 printf '%s' '<sellfox app secret>'       | gcloud secrets create sellfox-app-secret --data-file=-
+printf '%s' '<zoho app password>'        | gcloud secrets create b2b-mail-password --data-file=-
 
 RUNTIME_SA="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
-for s in b2b-db-password b2b-jwt-secret sellfox-app-id sellfox-app-secret; do
+for s in b2b-db-password b2b-jwt-secret sellfox-app-id sellfox-app-secret b2b-mail-password; do
   gcloud secrets add-iam-policy-binding "$s" \
       --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
 done
 ```
 
-**Check:** `gcloud secrets list` shows four, and `gcloud secrets versions access latest
+**Check:** `gcloud secrets list` shows five, and `gcloud secrets versions access latest
 --secret=b2b-jwt-secret | wc -c` prints something over 40.
 
 ---

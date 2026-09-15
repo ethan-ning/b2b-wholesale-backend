@@ -31,6 +31,9 @@ dependencies {
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    // SMTP for the reset-link mailer. The domain sees only the ResetLinkMailer port, so
+    // swapping to a provider's HTTP API later is a change to one adapter.
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     // Object storage for product images. The domain sees only the ImageStore port.
     implementation(platform("com.google.cloud:libraries-bom:26.50.0"))
     implementation("com.google.cloud:google-cloud-storage")
